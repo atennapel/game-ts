@@ -1,0 +1,10 @@
+{
+	"devDependencies": {
+		"prettier": "3.6.2",
+		"tsup": "^8.5.1",
+		"typescript": "^5.9.3"
+	},
+	"scripts": {
+		"bundle": "tsc --noEmit && tsup src/index.ts"
+	}
+}
