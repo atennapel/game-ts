@@ -1,4 +1,8 @@
 {
+	"name": "game-ts",
+	"version": "0.1.0",
+	"author": "Albert ten Napel",
+	"license": "Apache-2.0",
 	"devDependencies": {
 		"prettier": "3.6.2",
 		"tsup": "^8.5.1",
