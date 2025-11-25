@@ -1,3 +1,116 @@
+// src/graphics/color.ts
+var Color = class _Color {
+  r;
+  g;
+  b;
+  a;
+  constructor(r, g, b, a) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
+    this.a = a;
+  }
+  equals(other) {
+    return this.r == other.r && this.g == other.g && this.b == other.b && this.a == other.a;
+  }
+  static White = new _Color(255, 255, 255, 255);
+  static Black = new _Color(0, 0, 0, 255);
+  static Grey = new _Color(127, 127, 127, 255);
+  static Red = new _Color(255, 0, 0, 255);
+  static Blue = new _Color(0, 255, 0, 255);
+  static Green = new _Color(0, 0, 255, 255);
+  static Transparent = new _Color(0, 0, 0, 0);
+};
+var color_default = Color;
+
+// src/graphics/sprites.ts
+var Recolor = class {
+  background;
+  foreground;
+  image;
+  constructor(background, foreground, image) {
+    this.background = background;
+    this.foreground = foreground;
+    this.image = image;
+  }
+};
+var Sprites = class {
+  spriteWidth;
+  spriteHeight;
+  sprites = [];
+  recolors = /* @__PURE__ */ new Map();
+  constructor(spriteWidth, spriteHeight) {
+    this.spriteWidth = spriteWidth;
+    this.spriteHeight = spriteHeight;
+  }
+  async load(image, width, height) {
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const cols = Math.floor(width / spriteWidth);
+    const rows = Math.floor(height / spriteHeight);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const bitmap = await createImageBitmap(image, x * spriteWidth, y * spriteHeight, spriteWidth, spriteHeight);
+        this.sprites.push(bitmap);
+      }
+    }
+  }
+  async loadFromURL(url, width, height) {
+    await fetch(url).then((response) => response.blob()).then((blob) => this.load(blob, width, height));
+  }
+  get(index, backgroundColor, foregroundColor) {
+    const recolors = this.recolors;
+    let arr;
+    if (recolors.has(index)) {
+      arr = recolors.get(index);
+      for (let i = 0; i < arr.length; i++) {
+        const recolor = arr[i];
+        if (recolor.background.equals(backgroundColor) && recolor.foreground.equals(foregroundColor))
+          return recolor.image;
+      }
+    } else {
+      arr = [];
+      recolors.set(index, arr);
+    }
+    const image = this.sprites[index];
+    if (image) {
+      const newImage = this.recolor(image, backgroundColor, foregroundColor);
+      arr.push(new Recolor(backgroundColor, foregroundColor, newImage));
+      return newImage;
+    }
+    return null;
+  }
+  recolor(image, backgroundColor, foregroundColor) {
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const canvas2 = new OffscreenCanvas(spriteWidth, spriteHeight);
+    const ctx2 = canvas2.getContext("2d");
+    ctx2.drawImage(image, 0, 0);
+    const imageData = ctx2.getImageData(0, 0, spriteWidth, spriteHeight);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r == 255 && g == 255 && b == 255) {
+        data[i] = backgroundColor.r;
+        data[i + 1] = backgroundColor.g;
+        data[i + 2] = backgroundColor.b;
+        data[i + 3] = backgroundColor.a;
+      } else {
+        data[i] = foregroundColor.r;
+        data[i + 1] = foregroundColor.g;
+        data[i + 2] = foregroundColor.b;
+        data[i + 3] = foregroundColor.a;
+      }
+    }
+    ctx2.clearRect(0, 0, 16, 16);
+    ctx2.putImageData(imageData, 0, 0);
+    return canvas2.transferToImageBitmap();
+  }
+};
+var sprites_default = Sprites;
+
 // src/logic/tile.ts
 var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Empty"] = 0] = "Empty";
@@ -481,11 +594,36 @@ for (let x = 0; x < 40; x++) {
 }
 var pathfinding = new pathfinding_default(map);
 var shadowcasting = new shadowcasting_default(map);
+var sprites = new sprites_default(16, 16);
 var canvas = document.getElementById("canvas");
 var ctx = canvas.getContext("2d");
 function drawBlock(x, y, style) {
   ctx.fillStyle = style;
   ctx.fillRect(x * 16, y * 16, 16, 16);
+}
+function drawSprite(x, y, index, foreground) {
+  const image = sprites.get(index, color_default.White, foreground);
+  if (image) ctx.drawImage(image, x * 16, y * 16);
+}
+function drawTile(x, y) {
+  const visible = map.isVisible(x, y);
+  const tile = map.get(x, y);
+  if (visible) {
+    if (tile == tile_default.Empty) {
+      drawBlock(x, y, "white");
+    } else {
+      drawSprite(x, y, 1, color_default.Black);
+    }
+  } else {
+    if (map.isExplored(x, y)) {
+      if (tile == tile_default.Wall)
+        drawSprite(x, y, 1, color_default.Grey);
+      else
+        drawBlock(x, y, "grey");
+    } else {
+      drawBlock(x, y, "black");
+    }
+  }
 }
 var sx = 1;
 var sy = 1;
@@ -494,15 +632,11 @@ var gy = 10;
 function update() {
   for (let x = 0; x < 40; x++) {
     for (let y = 0; y < 40; y++) {
-      const explored = map.isExplored(x, y);
-      const visible = map.isVisible(x, y);
-      const blocked = map.isBlocked(x, y);
-      const color = visible ? blocked ? "brown" : "white" : explored ? blocked ? "dimgray" : "grey" : "black";
-      drawBlock(x, y, color);
+      drawTile(x, y);
     }
   }
   const path = pathfinding.findPath(sx, sy, gx, gy);
-  drawBlock(sx, sy, "red");
+  drawSprite(sx, sy, 0, color_default.Black);
   if (path) {
     for (const p of path)
       drawBlock(p.x, p.y, "green");
@@ -545,5 +679,7 @@ window.addEventListener("keypress", (event) => {
     update();
   }
 });
-shadowcasting.refreshVisibility(sx, sy);
-update();
+sprites.loadFromURL("images/sprites.bmp", 32, 32).then(() => {
+  shadowcasting.refreshVisibility(sx, sy);
+  update();
+}).catch((err) => console.error(err));

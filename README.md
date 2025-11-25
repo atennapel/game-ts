@@ -3,6 +3,14 @@ Roguelike experiments in TypeScript
 
 Try at https://atennapel.github.io/game-ts
 
+TODO:
+- [x] Pathfinding
+- [x] Shadow casting
+- [x] Sprites with re-coloring
+- [ ] Animation system
+- [ ] Turn-based system
+- [ ] NPCs
+
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm
 https://github.com/munificent/hauberk/
