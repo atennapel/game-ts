@@ -1,5 +1,5 @@
 import Tile from "./tile";
-import { array2d } from "./util";
+import { array2d } from "../util";
 
 class Map {
   readonly width: number;

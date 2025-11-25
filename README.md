@@ -7,6 +7,7 @@ TODO:
 - [x] Pathfinding
 - [x] Shadow casting
 - [x] Sprites with re-coloring
+- [x] Basic animation
 - [ ] Animation system
 - [ ] Turn-based system
 - [ ] NPCs

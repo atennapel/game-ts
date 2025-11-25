@@ -24,17 +24,7 @@ var Color = class _Color {
 var color_default = Color;
 
 // src/graphics/sprites.ts
-var Recolor = class {
-  background;
-  foreground;
-  image;
-  constructor(background, foreground, image) {
-    this.background = background;
-    this.foreground = foreground;
-    this.image = image;
-  }
-};
-var Sprites = class {
+var Sprites = class _Sprites {
   spriteWidth;
   spriteHeight;
   sprites = [];
@@ -48,9 +38,9 @@ var Sprites = class {
     const spriteHeight = this.spriteHeight;
     const cols = Math.floor(width / spriteWidth);
     const rows = Math.floor(height / spriteHeight);
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const bitmap = await createImageBitmap(image, x * spriteWidth, y * spriteHeight, spriteWidth, spriteHeight);
+    for (let y2 = 0; y2 < rows; y2++) {
+      for (let x2 = 0; x2 < cols; x2++) {
+        const bitmap = await createImageBitmap(image, x2 * spriteWidth, y2 * spriteHeight, spriteWidth, spriteHeight);
         this.sprites.push(bitmap);
       }
     }
@@ -60,25 +50,19 @@ var Sprites = class {
   }
   get(index, backgroundColor, foregroundColor) {
     const recolors = this.recolors;
-    let arr;
-    if (recolors.has(index)) {
-      arr = recolors.get(index);
-      for (let i = 0; i < arr.length; i++) {
-        const recolor = arr[i];
-        if (recolor.background.equals(backgroundColor) && recolor.foreground.equals(foregroundColor))
-          return recolor.image;
-      }
-    } else {
-      arr = [];
-      recolors.set(index, arr);
-    }
+    const hash = `${index},${_Sprites.colorHash(backgroundColor)},${_Sprites.colorHash(foregroundColor)}`;
+    const recoloredImage = recolors.get(hash);
+    if (recoloredImage) return recoloredImage;
     const image = this.sprites[index];
     if (image) {
       const newImage = this.recolor(image, backgroundColor, foregroundColor);
-      arr.push(new Recolor(backgroundColor, foregroundColor, newImage));
+      recolors.set(hash, newImage);
       return newImage;
     }
     return null;
+  }
+  static colorHash(c) {
+    return `${c.r},${c.g},${c.b},${c.a}`;
   }
   recolor(image, backgroundColor, foregroundColor) {
     const spriteWidth = this.spriteWidth;
@@ -125,14 +109,14 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
 })(Tile || (Tile = {}));
 var tile_default = Tile;
 
-// src/logic/util.ts
+// src/util.ts
 function array2d(width, height, value) {
   const result = new Array(width);
-  for (let x = 0; x < width; x++) {
+  for (let x2 = 0; x2 < width; x2++) {
     const inner = new Array(height);
-    for (let y = 0; y < height; y++)
-      inner[y] = value;
-    result[x] = inner;
+    for (let y2 = 0; y2 < height; y2++)
+      inner[y2] = value;
+    result[x2] = inner;
   }
   return result;
 }
@@ -151,35 +135,35 @@ var Map2 = class {
     this.visible = array2d(width, height, false);
     this.explored = array2d(width, height, false);
   }
-  set(x, y, tile) {
-    this.map[x][y] = tile;
+  set(x2, y2, tile) {
+    this.map[x2][y2] = tile;
   }
-  get(x, y) {
-    return this.map[x][y];
+  get(x2, y2) {
+    return this.map[x2][y2];
   }
-  isBlocked(x, y) {
-    return tile_default.isBlocked(this.map[x][y]);
+  isBlocked(x2, y2) {
+    return tile_default.isBlocked(this.map[x2][y2]);
   }
-  isVisible(x, y) {
-    return this.visible[x][y];
+  isVisible(x2, y2) {
+    return this.visible[x2][y2];
   }
-  isExplored(x, y) {
-    return this.explored[x][y];
+  isExplored(x2, y2) {
+    return this.explored[x2][y2];
   }
-  setVisible(x, y, isVisible) {
-    this.visible[x][y] = isVisible;
-    if (isVisible) this.explored[x][y] = true;
+  setVisible(x2, y2, isVisible) {
+    this.visible[x2][y2] = isVisible;
+    if (isVisible) this.explored[x2][y2] = true;
   }
-  setExplored(x, y, isExplored) {
-    this.explored[x][y] = isExplored;
+  setExplored(x2, y2, isExplored) {
+    this.explored[x2][y2] = isExplored;
   }
   reset() {
     const width = this.width;
     const height = this.height;
-    for (let x = 0; x < width; x++) {
-      for (let y = 0; y < height; y++) {
-        this.visible[x][y] = false;
-        this.explored[x][y] = false;
+    for (let x2 = 0; x2 < width; x2++) {
+      for (let y2 = 0; y2 < height; y2++) {
+        this.visible[x2][y2] = false;
+        this.explored[x2][y2] = false;
       }
     }
   }
@@ -190,9 +174,9 @@ var map_default = Map2;
 var Pos = class {
   x;
   y;
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
+  constructor(x2, y2) {
+    this.x = x2;
+    this.y = y2;
   }
   toString() {
     return `(${this.x}, ${this.y})`;
@@ -324,10 +308,10 @@ var PriorityQueue = class {
     }
     let s = --this._size;
     let result = this._queue[0];
-    let x = this._queue[s];
+    let x2 = this._queue[s];
     this._queue.slice(s, 1);
     if (s !== 0) {
-      this.sink(0, x);
+      this.sink(0, x2);
     }
     return result;
   }
@@ -375,10 +359,10 @@ var Loc = class _Loc {
   y;
   hash;
   priority;
-  constructor(x, y, priority) {
-    this.x = x;
-    this.y = y;
-    this.hash = x * 1e5 + y;
+  constructor(x2, y2, priority) {
+    this.x = x2;
+    this.y = y2;
+    this.hash = x2 * 1e5 + y2;
     this.priority = priority;
   }
   compare(other) {
@@ -389,11 +373,11 @@ var Loc = class _Loc {
   }
   neighbours(map2) {
     const ns = [];
-    const x = this.x;
-    const y = this.y;
-    for (let nx = x - 1; nx <= x + 1; nx++) {
-      for (let ny = y - 1; ny <= y + 1; ny++) {
-        if (nx < 0 || nx >= map2.width || ny < 0 || ny >= map2.height || nx == x && ny == y || map2.isBlocked(nx, ny))
+    const x2 = this.x;
+    const y2 = this.y;
+    for (let nx = x2 - 1; nx <= x2 + 1; nx++) {
+      for (let ny = y2 - 1; ny <= y2 + 1; ny++) {
+        if (nx < 0 || nx >= map2.width || ny < 0 || ny >= map2.height || nx == x2 && ny == y2 || map2.isBlocked(nx, ny))
           continue;
         ns.push(new _Loc(nx, ny, 0));
       }
@@ -409,22 +393,22 @@ var PathFinding = class _PathFinding {
   constructor(map2) {
     this.map = map2;
   }
-  static heuristic(x, y, gx2, gy2) {
-    const ox = Math.abs(gx2 - x);
-    const oy = Math.abs(gy2 - y);
-    const diagonal = Math.min(ox, oy);
-    const straight = Math.max(ox, oy) - diagonal;
+  static heuristic(x2, y2, gx2, gy2) {
+    const ox2 = Math.abs(gx2 - x2);
+    const oy2 = Math.abs(gy2 - y2);
+    const diagonal = Math.min(ox2, oy2);
+    const straight = Math.max(ox2, oy2) - diagonal;
     return straight * 10 + diagonal * 11;
   }
-  cost(x, y) {
+  cost(x2, y2) {
     return 10;
   }
-  findPath(x, y, gx2, gy2) {
+  findPath(x2, y2, gx2, gy2) {
     const cameFrom = /* @__PURE__ */ new Map();
     const costSoFar = /* @__PURE__ */ new Map();
     const frontier = new priorityqueue_default(10, (a, b) => a.compare(b));
     const goal = new Loc(gx2, gy2, 0);
-    const start = new Loc(x, y, 0);
+    const start = new Loc(x2, y2, 0);
     frontier.add(start);
     cameFrom.set(start.hash, start);
     costSoFar.set(start.hash, 0);
@@ -521,31 +505,31 @@ var ShadowCasting = class _ShadowCasting {
   constructor(map2) {
     this.map = map2;
   }
-  refreshVisibility(x, y) {
-    this.refreshOctant(x, y, 0);
-    this.refreshOctant(x, y, 1);
-    this.refreshOctant(x, y, 2);
-    this.refreshOctant(x, y, 3);
-    this.refreshOctant(x, y, 4);
-    this.refreshOctant(x, y, 5);
-    this.refreshOctant(x, y, 6);
-    this.refreshOctant(x, y, 7);
-    this.map.setVisible(x, y, true);
+  refreshVisibility(x2, y2) {
+    this.refreshOctant(x2, y2, 0);
+    this.refreshOctant(x2, y2, 1);
+    this.refreshOctant(x2, y2, 2);
+    this.refreshOctant(x2, y2, 3);
+    this.refreshOctant(x2, y2, 4);
+    this.refreshOctant(x2, y2, 5);
+    this.refreshOctant(x2, y2, 6);
+    this.refreshOctant(x2, y2, 7);
+    this.map.setVisible(x2, y2, true);
   }
-  refreshOctant(x, y, octant) {
+  refreshOctant(x2, y2, octant) {
     const width = this.map.width;
     const height = this.map.height;
     const line = new ShadowLine();
     let fullShadow = false;
     for (let row = 1; ; row++) {
       const posOctantTop = _ShadowCasting.transformOctant(row, 0, octant);
-      const posXTop = x + posOctantTop.x;
-      const posYTop = y + posOctantTop.y;
+      const posXTop = x2 + posOctantTop.x;
+      const posYTop = y2 + posOctantTop.y;
       if (posXTop < 0 || posXTop >= width || posYTop < 0 || posYTop >= height) break;
       for (let col = 0; col <= row; col++) {
         const posOctant = _ShadowCasting.transformOctant(row, col, octant);
-        const posX = x + posOctant.x;
-        const posY = y + posOctant.y;
+        const posX = x2 + posOctant.x;
+        const posY = y2 + posOctant.y;
         if (posX < 0 || posX >= width || posY < 0 || posY >= height) break;
         if (fullShadow)
           this.map.setVisible(posX, posY, false);
@@ -586,10 +570,10 @@ var shadowcasting_default = ShadowCasting;
 
 // src/index.ts
 var map = new map_default(40, 40);
-for (let x = 0; x < 40; x++) {
-  for (let y = 0; y < 40; y++) {
-    if (x == 0 || y == 0 || x == 39 || y == 39)
-      map.set(x, y, tile_default.Wall);
+for (let x2 = 0; x2 < 40; x2++) {
+  for (let y2 = 0; y2 < 40; y2++) {
+    if (x2 == 0 || y2 == 0 || x2 == 39 || y2 == 39)
+      map.set(x2, y2, tile_default.Wall);
   }
 }
 var pathfinding = new pathfinding_default(map);
@@ -597,89 +581,174 @@ var shadowcasting = new shadowcasting_default(map);
 var sprites = new sprites_default(16, 16);
 var canvas = document.getElementById("canvas");
 var ctx = canvas.getContext("2d");
-function drawBlock(x, y, style) {
+function drawBlock(x2, y2, style) {
   ctx.fillStyle = style;
-  ctx.fillRect(x * 16, y * 16, 16, 16);
+  ctx.fillRect(x2 * 16, y2 * 16, 16, 16);
 }
-function drawSprite(x, y, index, foreground) {
+function drawSpriteAbs(x2, y2, index, foreground) {
   const image = sprites.get(index, color_default.White, foreground);
-  if (image) ctx.drawImage(image, x * 16, y * 16);
+  if (image) ctx.drawImage(image, x2, y2);
 }
-function drawTile(x, y) {
-  const visible = map.isVisible(x, y);
-  const tile = map.get(x, y);
+function drawSprite(x2, y2, index, foreground) {
+  drawSpriteAbs(x2 * 16, y2 * 16, index, foreground);
+}
+function drawTile(x2, y2) {
+  const visible = map.isVisible(x2, y2);
+  const tile = map.get(x2, y2);
   if (visible) {
     if (tile == tile_default.Empty) {
-      drawBlock(x, y, "white");
+      drawBlock(x2, y2, "white");
     } else {
-      drawSprite(x, y, 1, color_default.Black);
+      drawSprite(x2, y2, 1, color_default.Black);
     }
   } else {
-    if (map.isExplored(x, y)) {
+    if (map.isExplored(x2, y2)) {
       if (tile == tile_default.Wall)
-        drawSprite(x, y, 1, color_default.Grey);
+        drawSprite(x2, y2, 1, color_default.Grey);
       else
-        drawBlock(x, y, "grey");
+        drawBlock(x2, y2, "grey");
     } else {
-      drawBlock(x, y, "black");
+      drawBlock(x2, y2, "black");
     }
   }
 }
+var x = 16;
+var y = 16;
 var sx = 1;
 var sy = 1;
-var gx = 10;
-var gy = 10;
-function update() {
-  for (let x = 0; x < 40; x++) {
-    for (let y = 0; y < 40; y++) {
-      drawTile(x, y);
+var ox = 0;
+var oy = 0;
+var gx = 0;
+var gy = 0;
+var path = null;
+var keyZ = false;
+var keyX = false;
+function draw() {
+  for (let x2 = 0; x2 < 40; x2++) {
+    for (let y2 = 0; y2 < 40; y2++) {
+      drawTile(x2, y2);
     }
   }
-  const path = pathfinding.findPath(sx, sy, gx, gy);
-  drawSprite(sx, sy, 0, color_default.Black);
+  ctx.fillStyle = "green";
+  ctx.fillRect(gx * 16, gy * 16, 16, 16);
   if (path) {
     for (const p of path)
-      drawBlock(p.x, p.y, "green");
+      ctx.fillRect(p.x * 16, p.y * 16, 16, 16);
   }
+  drawSpriteAbs(x, y, 0, color_default.Black);
 }
 canvas.addEventListener("mousedown", (event) => {
-  const x = Math.floor(event.offsetX / 16);
-  const y = Math.floor(event.offsetY / 16);
-  const t = map.get(x, y);
-  if (t == tile_default.Empty) map.set(x, y, tile_default.Wall);
-  else map.set(x, y, tile_default.Empty);
-  shadowcasting.refreshVisibility(sx, sy);
-  update();
+  gx = Math.floor(event.offsetX / 16);
+  gy = Math.floor(event.offsetY / 16);
+  path = pathfinding.findPath(sx, sy, gx, gy);
+  if (path) path.reverse();
 });
 canvas.addEventListener("mousemove", (event) => {
-  const x = Math.floor(event.offsetX / 16);
-  const y = Math.floor(event.offsetY / 16);
-  gx = x;
-  gy = y;
-  if (event.buttons == 1) {
-    const t = map.get(x, y);
-    if (t == tile_default.Empty) map.set(x, y, tile_default.Wall);
-    else map.set(x, y, tile_default.Empty);
+  gx = Math.floor(event.offsetX / 16);
+  gy = Math.floor(event.offsetY / 16);
+  if (keyZ) {
+    map.set(gx, gy, tile_default.Empty);
+    shadowcasting.refreshVisibility(sx, sy);
+  } else if (keyX) {
+    map.set(gx, gy, tile_default.Wall);
     shadowcasting.refreshVisibility(sx, sy);
   }
-  update();
 });
 window.addEventListener("keydown", (event) => {
-  if (event.key == "w") sy -= 1;
-  else if (event.key == "s") sy += 1;
-  if (event.key == "a") sx -= 1;
-  else if (event.key == "d") sx += 1;
-  shadowcasting.refreshVisibility(sx, sy);
-  update();
+  if (oy == 0) {
+    if (event.key == "w") oy = -16;
+    else if (event.key == "s") oy = 16;
+  }
+  if (ox == 0) {
+    if (event.key == "a") ox = -16;
+    else if (event.key == "d") ox = 16;
+  }
+  if (event.key == "z") {
+    keyZ = true;
+    map.set(gx, gy, tile_default.Empty);
+    shadowcasting.refreshVisibility(sx, sy);
+  } else if (event.key == "x") {
+    keyX = true;
+    map.set(gx, gy, tile_default.Wall);
+    shadowcasting.refreshVisibility(sx, sy);
+  }
+});
+window.addEventListener("keyup", (event) => {
+  if (event.key == "z") {
+    keyZ = false;
+  } else if (event.key == "x") {
+    keyX = false;
+  }
 });
 window.addEventListener("keypress", (event) => {
   if (event.key == "r") {
     map.reset();
     shadowcasting.refreshVisibility(sx, sy);
-    update();
+    draw();
   }
 });
 sprites.loadFromURL("images/sprites.bmp", 32, 32).then(() => {
   shadowcasting.refreshVisibility(sx, sy);
-  update();
+  loop(0);
 }).catch((err) => console.error(err));
+var SPEED = 0.25;
+var lastTime = 0;
+function loop(time) {
+  const delta = lastTime == 0 ? 0 : time - lastTime;
+  lastTime = time;
+  if (path) {
+    if (path.length > 0) {
+      if (ox == 0 && oy == 0) {
+        const nextPos = path.pop();
+        if (nextPos.x > sx) ox = 16;
+        else if (nextPos.x < sx) ox = -16;
+        if (nextPos.y > sy) oy = 16;
+        else if (nextPos.y < sy) oy = -16;
+      }
+    } else path = null;
+  }
+  if (ox > 0) {
+    const dist = delta * SPEED;
+    x += dist;
+    ox -= dist;
+    if (ox < 0.1) {
+      ox = 0;
+      sx += 1;
+      x = sx * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  } else if (ox < 0) {
+    const dist = delta * SPEED;
+    x -= dist;
+    ox += dist;
+    if (ox > -0.1) {
+      ox = 0;
+      sx -= 1;
+      x = sx * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  }
+  if (oy > 0) {
+    const dist = delta * SPEED;
+    y += dist;
+    oy -= dist;
+    if (oy < 0.1) {
+      oy = 0;
+      sy += 1;
+      y = sy * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  } else if (oy < 0) {
+    const dist = delta * SPEED;
+    y -= dist;
+    oy += dist;
+    if (oy > -0.1) {
+      oy = 0;
+      sy -= 1;
+      y = sy * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  }
+  draw();
+  requestAnimationFrame(loop);
+}

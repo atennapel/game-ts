@@ -2,6 +2,7 @@ import Color from "./graphics/color";
 import Sprites from "./graphics/sprites";
 import Map from "./logic/map";
 import PathFinding from "./logic/pathfinding";
+import Pos from "./logic/pos";
 import ShadowCasting from "./logic/shadowcasting";
 import Tile from "./logic/tile";
 
@@ -26,9 +27,13 @@ function drawBlock(x: number, y: number, style: string) {
   ctx.fillRect(x * 16, y * 16, 16, 16);
 }
 
-function drawSprite(x: number, y: number, index: number, foreground: Color) {
+function drawSpriteAbs(x: number, y: number, index: number, foreground: Color) {
   const image = sprites.get(index, Color.White, foreground);
-  if (image) ctx.drawImage(image, x * 16, y * 16);
+  if (image) ctx.drawImage(image, x, y);
+}
+
+function drawSprite(x: number, y: number, index: number, foreground: Color) {
+  drawSpriteAbs(x * 16, y * 16, index, foreground);
 }
 
 function drawTile(x: number, y: number) {
@@ -52,70 +57,173 @@ function drawTile(x: number, y: number) {
   }
 }
 
+let x = 16;
+let y = 16;
 let sx = 1;
 let sy = 1;
-let gx = 10;
-let gy = 10;
+let ox = 0;
+let oy = 0;
+let gx = 0;
+let gy = 0;
+let path: Pos[] | null = null;
+let lastPlaced: Pos | null = null;
 
-function update() {
+let keyZ = false;
+let keyX = false;
+
+function draw() {
   for (let x = 0; x < 40; x++) {
     for (let y = 0; y < 40; y++) {
       drawTile(x, y);
     }
   }
 
-  const path = pathfinding.findPath(sx, sy, gx, gy);
-  drawSprite(sx, sy, 0, Color.Black);
+  ctx.fillStyle = "green";
+  ctx.fillRect(gx * 16, gy * 16, 16, 16);
   if (path) {
     for (const p of path)
-      drawBlock(p.x, p.y, "green");
+      ctx.fillRect(p.x * 16, p.y * 16, 16, 16);
   }
+
+  drawSpriteAbs(x, y, 0, Color.Black);
 }
 
 canvas.addEventListener("mousedown", event => {
-  const x = Math.floor(event.offsetX / 16);
-  const y = Math.floor(event.offsetY / 16);
-  const t = map.get(x, y);
-  if (t == Tile.Empty) map.set(x, y, Tile.Wall);
-  else map.set(x, y, Tile.Empty);
-  shadowcasting.refreshVisibility(sx, sy);
-  update();
+  gx = Math.floor(event.offsetX / 16);
+  gy = Math.floor(event.offsetY / 16);
+  // const t = map.get(x, y);
+  // if (t == Tile.Empty) map.set(x, y, Tile.Wall);
+  // else map.set(x, y, Tile.Empty);
+  // shadowcasting.refreshVisibility(sx, sy);
+  path = pathfinding.findPath(sx, sy, gx, gy);
+  if (path) path.reverse();
 });
 
 canvas.addEventListener("mousemove", event => {
+  gx = Math.floor(event.offsetX / 16);
+  gy = Math.floor(event.offsetY / 16);
+  /*
   const x = Math.floor(event.offsetX / 16);
   const y = Math.floor(event.offsetY / 16);
-  gx = x;
-  gy = y;
   if (event.buttons == 1) {
     const t = map.get(x, y);
     if (t == Tile.Empty) map.set(x, y, Tile.Wall);
     else map.set(x, y, Tile.Empty);
     shadowcasting.refreshVisibility(sx, sy);
+  }*/
+  if (keyZ) {
+    map.set(gx, gy, Tile.Empty);
+    shadowcasting.refreshVisibility(sx, sy);
+  } else if (keyX) {
+    map.set(gx, gy, Tile.Wall);
+    shadowcasting.refreshVisibility(sx, sy);
   }
-  update();
 });
 
 window.addEventListener("keydown", event => {
-  if (event.key == "w") sy -= 1;
-  else if (event.key == "s") sy += 1;
-  if (event.key == "a") sx -= 1;
-  else if (event.key == "d") sx += 1;
-  shadowcasting.refreshVisibility(sx, sy);
-  update();
+  if (oy == 0) {
+    if (event.key == "w") oy = -16;
+    else if (event.key == "s") oy = 16;
+  }
+  if (ox == 0) {
+    if (event.key == "a") ox = -16;
+    else if (event.key == "d") ox = 16;
+  }
+  if (event.key == "z") {
+    keyZ = true;
+    map.set(gx, gy, Tile.Empty);
+    shadowcasting.refreshVisibility(sx, sy);
+  } else if (event.key == "x") {
+    keyX = true;
+    map.set(gx, gy, Tile.Wall);
+    shadowcasting.refreshVisibility(sx, sy);
+  }
+});
+
+window.addEventListener("keyup", event => {
+  if (event.key == "z") {
+    keyZ = false;
+  } else if (event.key == "x") {
+    keyX = false;
+  }
 });
 
 window.addEventListener("keypress", event => {
   if (event.key == "r") {
     map.reset();
     shadowcasting.refreshVisibility(sx, sy);
-    update();
+    draw();
   }
 });
 
 sprites.loadFromURL("images/sprites.bmp", 32, 32)
   .then(() => {
     shadowcasting.refreshVisibility(sx, sy);
-    update();
+    loop(0);
   })
   .catch(err => console.error(err));
+
+const SPEED = 0.25;
+let lastTime = 0;
+function loop(time: DOMHighResTimeStamp) {
+  const delta = lastTime == 0 ? 0 : time - lastTime;
+  lastTime = time;
+
+  if (path) {
+    if (path.length > 0) {
+      if (ox == 0 && oy == 0) {
+        const nextPos = path.pop()!;
+        if (nextPos.x > sx) ox = 16;
+        else if (nextPos.x < sx) ox = -16;
+        if (nextPos.y > sy) oy = 16;
+        else if (nextPos.y < sy) oy = -16;
+      }
+    } else path = null;
+  }
+
+  if (ox > 0) {
+    const dist = delta * SPEED;
+    x += dist;
+    ox -= dist;
+    if (ox < 0.1) {
+      ox = 0;
+      sx += 1;
+      x = sx * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  } else if (ox < 0) {
+    const dist = delta * SPEED;
+    x -= dist;
+    ox += dist;
+    if (ox > -0.1) {
+      ox = 0;
+      sx -= 1;
+      x = sx * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  }
+  if (oy > 0) {
+    const dist = delta * SPEED;
+    y += dist;
+    oy -= dist;
+    if (oy < 0.1) {
+      oy = 0;
+      sy += 1;
+      y = sy * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  } else if (oy < 0) {
+    const dist = delta * SPEED;
+    y -= dist;
+    oy += dist;
+    if (oy > -0.1) {
+      oy = 0;
+      sy -= 1;
+      y = sy * 16;
+      shadowcasting.refreshVisibility(sx, sy);
+    }
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}

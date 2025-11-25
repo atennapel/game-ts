@@ -8,3 +8,8 @@ export function array2d<A>(width: number, height: number, value: A): A[][] {
   }
   return result;
 }
+
+export function num2hex2(n: number): string {
+  const s = n.toString(16);
+  return n < 16 ? `0${s}` : s;
+}

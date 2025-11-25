@@ -1,3 +1,5 @@
+import { num2hex2 } from "../util";
+
 class Color {
   readonly r: number;
   readonly g: number;

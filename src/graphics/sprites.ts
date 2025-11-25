@@ -1,22 +1,10 @@
 import Color from "./color";
 
-class Recolor {
-  readonly background: Color;
-  readonly foreground: Color;
-  readonly image: ImageBitmap;
-
-  constructor(background: Color, foreground: Color, image: ImageBitmap) {
-    this.background = background;
-    this.foreground = foreground;
-    this.image = image;
-  }
-}
-
 class Sprites {
   private readonly spriteWidth: number;
   private readonly spriteHeight: number;
   private readonly sprites: ImageBitmap[] = [];
-  private readonly recolors: Map<number, Recolor[]> = new Map();
+  private readonly recolors: Map<string, ImageBitmap> = new Map();
 
   constructor(spriteWidth: number, spriteHeight: number) {
     this.spriteWidth = spriteWidth;
@@ -44,25 +32,20 @@ class Sprites {
 
   get(index: number, backgroundColor: Color, foregroundColor: Color): ImageBitmap | null {
     const recolors = this.recolors;
-    let arr: Recolor[];
-    if (recolors.has(index)) {
-      arr = recolors.get(index)!;
-      for (let i = 0; i < arr.length; i++) {
-        const recolor = arr[i];
-        if (recolor.background.equals(backgroundColor) && recolor.foreground.equals(foregroundColor))
-          return recolor.image;
-      }
-    } else {
-      arr = [];
-      recolors.set(index, arr);
-    }
+    const hash = `${index},${Sprites.colorHash(backgroundColor)},${Sprites.colorHash(foregroundColor)}`;
+    const recoloredImage = recolors.get(hash);
+    if (recoloredImage) return recoloredImage;
     const image = this.sprites[index];
     if (image) {
       const newImage = this.recolor(image, backgroundColor, foregroundColor);
-      arr.push(new Recolor(backgroundColor, foregroundColor, newImage));
+      recolors.set(hash, newImage);
       return newImage;
     }
     return null;
+  }
+
+  private static colorHash(c: Color): string {
+    return `${c.r},${c.g},${c.b},${c.a}`;
   }
 
   private recolor(image: ImageBitmap, backgroundColor: Color, foregroundColor: Color): ImageBitmap {
