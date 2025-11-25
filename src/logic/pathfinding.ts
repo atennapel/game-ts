@@ -3,67 +3,6 @@ import Pos from "./pos";
 import PriorityQueue from './priorityqueue';
 
 // Adaptation of https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm
-class Pathfinding {
-  private readonly map: M;
-
-  constructor(map: M) {
-    this.map = map;
-  }
-
-  private heuristic(x: number, y: number, gx: number, gy: number): number {
-    const ox = Math.abs(gx - x);
-    const oy = Math.abs(gy - y);
-    const diagonal = Math.min(ox, oy);
-    const straight = Math.max(ox, oy) - diagonal;
-    return straight * 10 + diagonal * 11;
-  }
-
-  private cost(x: number, y: number): number {
-    return 10;
-  }
-
-  findPath(x: number, y: number, gx: number, gy: number): Pos[] | null {
-    const cameFrom: Map<number, Loc> = new Map();
-    const costSoFar: Map<number, number> = new Map();
-    const frontier: PriorityQueue<Loc> = new PriorityQueue(10, (a: Loc, b: Loc) => a.compare(b));
-
-    const goal = new Loc(gx, gy, 0);
-    const start = new Loc(x, y, 0);
-    frontier.add(start);
-    cameFrom.set(start.hash, start);
-    costSoFar.set(start.hash, 0);
-
-    while (frontier.size() > 0) {
-      const current = frontier.poll()!;
-      if (current.equals(goal)) break;
-      for (const next of current.neighbours(this.map)) {
-        const newCost = costSoFar.get(current.hash)! + this.cost(next.x, next.y);
-        if (!costSoFar.has(next.hash) || newCost < costSoFar.get(next.hash)!) {
-          costSoFar.set(next.hash, newCost);
-          const priority = newCost + this.heuristic(next.x, next.y, gx, gy);
-          frontier.add(new Loc(next.x, next.y, priority));
-          cameFrom.set(next.hash, current);
-        }
-      }
-    }
-
-    if (!cameFrom.get(goal.hash)) return null;
-
-    const result: Pos[] = [new Pos(gx, gy)];
-    let current = goal;
-    while (!current.equals(start)) {
-      const next = cameFrom.get(current.hash)!;
-      if (next.equals(start)) {
-        result.reverse();
-        return result;
-      }
-      result.push(new Pos(next.x, next.y));
-      current = next;
-    }
-    return null;
-  }
-}
-
 class Loc {
   readonly x: number;
   readonly y: number;
@@ -104,4 +43,65 @@ class Loc {
   }
 }
 
-export default Pathfinding;
+class PathFinding {
+  private readonly map: M;
+
+  constructor(map: M) {
+    this.map = map;
+  }
+
+  private static heuristic(x: number, y: number, gx: number, gy: number): number {
+    const ox = Math.abs(gx - x);
+    const oy = Math.abs(gy - y);
+    const diagonal = Math.min(ox, oy);
+    const straight = Math.max(ox, oy) - diagonal;
+    return straight * 10 + diagonal * 11;
+  }
+
+  private cost(x: number, y: number): number {
+    return 10;
+  }
+
+  findPath(x: number, y: number, gx: number, gy: number): Pos[] | null {
+    const cameFrom: Map<number, Loc> = new Map();
+    const costSoFar: Map<number, number> = new Map();
+    const frontier: PriorityQueue<Loc> = new PriorityQueue(10, (a: Loc, b: Loc) => a.compare(b));
+
+    const goal = new Loc(gx, gy, 0);
+    const start = new Loc(x, y, 0);
+    frontier.add(start);
+    cameFrom.set(start.hash, start);
+    costSoFar.set(start.hash, 0);
+
+    while (frontier.size() > 0) {
+      const current = frontier.poll()!;
+      if (current.equals(goal)) break;
+      for (const next of current.neighbours(this.map)) {
+        const newCost = costSoFar.get(current.hash)! + this.cost(next.x, next.y);
+        if (!costSoFar.has(next.hash) || newCost < costSoFar.get(next.hash)!) {
+          costSoFar.set(next.hash, newCost);
+          const priority = newCost + PathFinding.heuristic(next.x, next.y, gx, gy);
+          frontier.add(new Loc(next.x, next.y, priority));
+          cameFrom.set(next.hash, current);
+        }
+      }
+    }
+
+    if (!cameFrom.get(goal.hash)) return null;
+
+    const result: Pos[] = [new Pos(gx, gy)];
+    let current = goal;
+    while (!current.equals(start)) {
+      const next = cameFrom.get(current.hash)!;
+      if (next.equals(start)) {
+        result.reverse();
+        return result;
+      }
+      result.push(new Pos(next.x, next.y));
+      current = next;
+    }
+    return null;
+  }
+}
+
+export default PathFinding;

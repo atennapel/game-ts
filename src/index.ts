@@ -1,5 +1,6 @@
 import Map from "./logic/map";
-import Pathfinding from "./logic/pathfinding";
+import PathFinding from "./logic/pathfinding";
+import ShadowCasting from "./logic/shadowcasting";
 import Tile from "./logic/tile";
 
 const map = new Map(40, 40);
@@ -10,7 +11,8 @@ for (let x = 0; x < 40; x++) {
   }
 }
 
-const pathfinding = new Pathfinding(map);
+const pathfinding = new PathFinding(map);
+const shadowcasting = new ShadowCasting(map);
 
 const canvas = <HTMLCanvasElement>document.getElementById("canvas");
 const ctx = canvas.getContext("2d")!;
@@ -28,10 +30,13 @@ let gy = 10;
 function update() {
   for (let x = 0; x < 40; x++) {
     for (let y = 0; y < 40; y++) {
-      if (map.isBlocked(x, y))
-        drawBlock(x, y, "black");
-      else
-        drawBlock(x, y, "white");
+      const explored = map.isExplored(x, y);
+      const visible = map.isVisible(x, y);
+      const blocked = map.isBlocked(x, y);
+      const color = visible ?
+        (blocked ? "brown" : "white") :
+        explored ? (blocked ? "dimgray" : "grey") : "black";
+      drawBlock(x, y, color);
     }
   }
 
@@ -43,20 +48,27 @@ function update() {
   }
 }
 
-update();
-
 canvas.addEventListener("mousedown", event => {
   const x = Math.floor(event.offsetX / 16);
   const y = Math.floor(event.offsetY / 16);
   const t = map.get(x, y);
   if (t == Tile.Empty) map.set(x, y, Tile.Wall);
   else map.set(x, y, Tile.Empty);
+  shadowcasting.refreshVisibility(sx, sy);
   update();
 });
 
 canvas.addEventListener("mousemove", event => {
-  gx = Math.floor(event.offsetX / 16);
-  gy = Math.floor(event.offsetY / 16);
+  const x = Math.floor(event.offsetX / 16);
+  const y = Math.floor(event.offsetY / 16);
+  gx = x;
+  gy = y;
+  if (event.buttons == 1) {
+    const t = map.get(x, y);
+    if (t == Tile.Empty) map.set(x, y, Tile.Wall);
+    else map.set(x, y, Tile.Empty);
+    shadowcasting.refreshVisibility(sx, sy);
+  }
   update();
 });
 
@@ -65,5 +77,17 @@ window.addEventListener("keydown", event => {
   else if (event.key == "s") sy += 1;
   if (event.key == "a") sx -= 1;
   else if (event.key == "d") sx += 1;
+  shadowcasting.refreshVisibility(sx, sy);
   update();
 });
+
+window.addEventListener("keypress", event => {
+  if (event.key == "r") {
+    map.reset();
+    shadowcasting.refreshVisibility(sx, sy);
+    update();
+  }
+});
+
+shadowcasting.refreshVisibility(sx, sy);
+update();

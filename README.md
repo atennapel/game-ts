@@ -1,6 +1,8 @@
 # game-ts
 Roguelike experiments in TypeScript
 
+Try at https://atennapel.github.io/game-ts
+
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm
 https://github.com/munificent/hauberk/

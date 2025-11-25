@@ -44,6 +44,17 @@ class Map {
   setExplored(x: number, y: number, isExplored: boolean): void {
     this.explored[x][y] = isExplored;
   }
+
+  reset() {
+    const width = this.width;
+    const height = this.height;
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        this.visible[x][y] = false;
+        this.explored[x][y] = false;
+      }
+    }
+  }
 }
 
 export default Map;
