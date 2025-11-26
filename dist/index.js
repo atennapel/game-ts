@@ -1,100 +1,3 @@
-// src/graphics/color.ts
-var Color = class _Color {
-  r;
-  g;
-  b;
-  a;
-  constructor(r, g, b, a) {
-    this.r = r;
-    this.g = g;
-    this.b = b;
-    this.a = a;
-  }
-  equals(other) {
-    return this.r == other.r && this.g == other.g && this.b == other.b && this.a == other.a;
-  }
-  static White = new _Color(255, 255, 255, 255);
-  static Black = new _Color(0, 0, 0, 255);
-  static Grey = new _Color(127, 127, 127, 255);
-  static Red = new _Color(255, 0, 0, 255);
-  static Blue = new _Color(0, 255, 0, 255);
-  static Green = new _Color(0, 0, 255, 255);
-  static Transparent = new _Color(0, 0, 0, 0);
-};
-var color_default = Color;
-
-// src/graphics/sprites.ts
-var Sprites = class _Sprites {
-  spriteWidth;
-  spriteHeight;
-  sprites = [];
-  recolors = /* @__PURE__ */ new Map();
-  constructor(spriteWidth, spriteHeight) {
-    this.spriteWidth = spriteWidth;
-    this.spriteHeight = spriteHeight;
-  }
-  async load(image, width, height) {
-    const spriteWidth = this.spriteWidth;
-    const spriteHeight = this.spriteHeight;
-    const cols = Math.floor(width / spriteWidth);
-    const rows = Math.floor(height / spriteHeight);
-    for (let y2 = 0; y2 < rows; y2++) {
-      for (let x2 = 0; x2 < cols; x2++) {
-        const bitmap = await createImageBitmap(image, x2 * spriteWidth, y2 * spriteHeight, spriteWidth, spriteHeight);
-        this.sprites.push(bitmap);
-      }
-    }
-  }
-  async loadFromURL(url, width, height) {
-    await fetch(url).then((response) => response.blob()).then((blob) => this.load(blob, width, height));
-  }
-  get(index, backgroundColor, foregroundColor) {
-    const recolors = this.recolors;
-    const hash = `${index},${_Sprites.colorHash(backgroundColor)},${_Sprites.colorHash(foregroundColor)}`;
-    const recoloredImage = recolors.get(hash);
-    if (recoloredImage) return recoloredImage;
-    const image = this.sprites[index];
-    if (image) {
-      const newImage = this.recolor(image, backgroundColor, foregroundColor);
-      recolors.set(hash, newImage);
-      return newImage;
-    }
-    return null;
-  }
-  static colorHash(c) {
-    return `${c.r},${c.g},${c.b},${c.a}`;
-  }
-  recolor(image, backgroundColor, foregroundColor) {
-    const spriteWidth = this.spriteWidth;
-    const spriteHeight = this.spriteHeight;
-    const canvas2 = new OffscreenCanvas(spriteWidth, spriteHeight);
-    const ctx2 = canvas2.getContext("2d");
-    ctx2.drawImage(image, 0, 0);
-    const imageData = ctx2.getImageData(0, 0, spriteWidth, spriteHeight);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      if (r == 255 && g == 255 && b == 255) {
-        data[i] = backgroundColor.r;
-        data[i + 1] = backgroundColor.g;
-        data[i + 2] = backgroundColor.b;
-        data[i + 3] = backgroundColor.a;
-      } else {
-        data[i] = foregroundColor.r;
-        data[i + 1] = foregroundColor.g;
-        data[i + 2] = foregroundColor.b;
-        data[i + 3] = foregroundColor.a;
-      }
-    }
-    ctx2.clearRect(0, 0, 16, 16);
-    ctx2.putImageData(imageData, 0, 0);
-    return canvas2.transferToImageBitmap();
-  }
-};
-var sprites_default = Sprites;
-
 // src/logic/tile.ts
 var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Empty"] = 0] = "Empty";
@@ -112,11 +15,11 @@ var tile_default = Tile;
 // src/util.ts
 function array2d(width, height, value) {
   const result = new Array(width);
-  for (let x2 = 0; x2 < width; x2++) {
+  for (let x = 0; x < width; x++) {
     const inner = new Array(height);
-    for (let y2 = 0; y2 < height; y2++)
-      inner[y2] = value;
-    result[x2] = inner;
+    for (let y = 0; y < height; y++)
+      inner[y] = value;
+    result[x] = inner;
   }
   return result;
 }
@@ -135,35 +38,35 @@ var Map2 = class {
     this.visible = array2d(width, height, false);
     this.explored = array2d(width, height, false);
   }
-  set(x2, y2, tile) {
-    this.map[x2][y2] = tile;
+  set(x, y, tile) {
+    this.map[x][y] = tile;
   }
-  get(x2, y2) {
-    return this.map[x2][y2];
+  get(x, y) {
+    return this.map[x][y];
   }
-  isBlocked(x2, y2) {
-    return tile_default.isBlocked(this.map[x2][y2]);
+  isBlocked(x, y) {
+    return tile_default.isBlocked(this.map[x][y]);
   }
-  isVisible(x2, y2) {
-    return this.visible[x2][y2];
+  isVisible(x, y) {
+    return this.visible[x][y];
   }
-  isExplored(x2, y2) {
-    return this.explored[x2][y2];
+  isExplored(x, y) {
+    return this.explored[x][y];
   }
-  setVisible(x2, y2, isVisible) {
-    this.visible[x2][y2] = isVisible;
-    if (isVisible) this.explored[x2][y2] = true;
+  setVisible(x, y, isVisible) {
+    this.visible[x][y] = isVisible;
+    if (isVisible) this.explored[x][y] = true;
   }
-  setExplored(x2, y2, isExplored) {
-    this.explored[x2][y2] = isExplored;
+  setExplored(x, y, isExplored) {
+    this.explored[x][y] = isExplored;
   }
   reset() {
     const width = this.width;
     const height = this.height;
-    for (let x2 = 0; x2 < width; x2++) {
-      for (let y2 = 0; y2 < height; y2++) {
-        this.visible[x2][y2] = false;
-        this.explored[x2][y2] = false;
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        this.visible[x][y] = false;
+        this.explored[x][y] = false;
       }
     }
   }
@@ -174,9 +77,9 @@ var map_default = Map2;
 var Pos = class {
   x;
   y;
-  constructor(x2, y2) {
-    this.x = x2;
-    this.y = y2;
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
   }
   toString() {
     return `(${this.x}, ${this.y})`;
@@ -308,10 +211,10 @@ var PriorityQueue = class {
     }
     let s = --this._size;
     let result = this._queue[0];
-    let x2 = this._queue[s];
+    let x = this._queue[s];
     this._queue.slice(s, 1);
     if (s !== 0) {
-      this.sink(0, x2);
+      this.sink(0, x);
     }
     return result;
   }
@@ -359,10 +262,10 @@ var Loc = class _Loc {
   y;
   hash;
   priority;
-  constructor(x2, y2, priority) {
-    this.x = x2;
-    this.y = y2;
-    this.hash = x2 * 1e5 + y2;
+  constructor(x, y, priority) {
+    this.x = x;
+    this.y = y;
+    this.hash = x * 1e5 + y;
     this.priority = priority;
   }
   compare(other) {
@@ -371,13 +274,13 @@ var Loc = class _Loc {
   equals(other) {
     return this.x == other.x && this.y == other.y;
   }
-  neighbours(map2) {
+  neighbours(map) {
     const ns = [];
-    const x2 = this.x;
-    const y2 = this.y;
-    for (let nx = x2 - 1; nx <= x2 + 1; nx++) {
-      for (let ny = y2 - 1; ny <= y2 + 1; ny++) {
-        if (nx < 0 || nx >= map2.width || ny < 0 || ny >= map2.height || nx == x2 && ny == y2 || map2.isBlocked(nx, ny))
+    const x = this.x;
+    const y = this.y;
+    for (let nx = x - 1; nx <= x + 1; nx++) {
+      for (let ny = y - 1; ny <= y + 1; ny++) {
+        if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height || nx == x && ny == y || map.isBlocked(nx, ny))
           continue;
         ns.push(new _Loc(nx, ny, 0));
       }
@@ -390,25 +293,25 @@ var Loc = class _Loc {
 };
 var PathFinding = class _PathFinding {
   map;
-  constructor(map2) {
-    this.map = map2;
+  constructor(map) {
+    this.map = map;
   }
-  static heuristic(x2, y2, gx2, gy2) {
-    const ox2 = Math.abs(gx2 - x2);
-    const oy2 = Math.abs(gy2 - y2);
-    const diagonal = Math.min(ox2, oy2);
-    const straight = Math.max(ox2, oy2) - diagonal;
+  static heuristic(x, y, gx, gy) {
+    const ox = Math.abs(gx - x);
+    const oy = Math.abs(gy - y);
+    const diagonal = Math.min(ox, oy);
+    const straight = Math.max(ox, oy) - diagonal;
     return straight * 10 + diagonal * 11;
   }
-  cost(x2, y2) {
+  cost(x, y) {
     return 10;
   }
-  findPath(x2, y2, gx2, gy2) {
+  findPath(x, y, gx, gy) {
     const cameFrom = /* @__PURE__ */ new Map();
     const costSoFar = /* @__PURE__ */ new Map();
     const frontier = new priorityqueue_default(10, (a, b) => a.compare(b));
-    const goal = new Loc(gx2, gy2, 0);
-    const start = new Loc(x2, y2, 0);
+    const goal = new Loc(gx, gy, 0);
+    const start = new Loc(x, y, 0);
     frontier.add(start);
     cameFrom.set(start.hash, start);
     costSoFar.set(start.hash, 0);
@@ -419,14 +322,14 @@ var PathFinding = class _PathFinding {
         const newCost = costSoFar.get(current2.hash) + this.cost(next.x, next.y);
         if (!costSoFar.has(next.hash) || newCost < costSoFar.get(next.hash)) {
           costSoFar.set(next.hash, newCost);
-          const priority = newCost + _PathFinding.heuristic(next.x, next.y, gx2, gy2);
+          const priority = newCost + _PathFinding.heuristic(next.x, next.y, gx, gy);
           frontier.add(new Loc(next.x, next.y, priority));
           cameFrom.set(next.hash, current2);
         }
       }
     }
     if (!cameFrom.get(goal.hash)) return null;
-    const result = [new pos_default(gx2, gy2)];
+    const result = [new pos_default(gx, gy)];
     let current = goal;
     while (!current.equals(start)) {
       const next = cameFrom.get(current.hash);
@@ -502,34 +405,34 @@ var ShadowLine = class {
 };
 var ShadowCasting = class _ShadowCasting {
   map;
-  constructor(map2) {
-    this.map = map2;
+  constructor(map) {
+    this.map = map;
   }
-  refreshVisibility(x2, y2) {
-    this.refreshOctant(x2, y2, 0);
-    this.refreshOctant(x2, y2, 1);
-    this.refreshOctant(x2, y2, 2);
-    this.refreshOctant(x2, y2, 3);
-    this.refreshOctant(x2, y2, 4);
-    this.refreshOctant(x2, y2, 5);
-    this.refreshOctant(x2, y2, 6);
-    this.refreshOctant(x2, y2, 7);
-    this.map.setVisible(x2, y2, true);
+  refreshVisibility(x, y) {
+    this.refreshOctant(x, y, 0);
+    this.refreshOctant(x, y, 1);
+    this.refreshOctant(x, y, 2);
+    this.refreshOctant(x, y, 3);
+    this.refreshOctant(x, y, 4);
+    this.refreshOctant(x, y, 5);
+    this.refreshOctant(x, y, 6);
+    this.refreshOctant(x, y, 7);
+    this.map.setVisible(x, y, true);
   }
-  refreshOctant(x2, y2, octant) {
+  refreshOctant(x, y, octant) {
     const width = this.map.width;
     const height = this.map.height;
     const line = new ShadowLine();
     let fullShadow = false;
     for (let row = 1; ; row++) {
       const posOctantTop = _ShadowCasting.transformOctant(row, 0, octant);
-      const posXTop = x2 + posOctantTop.x;
-      const posYTop = y2 + posOctantTop.y;
+      const posXTop = x + posOctantTop.x;
+      const posYTop = y + posOctantTop.y;
       if (posXTop < 0 || posXTop >= width || posYTop < 0 || posYTop >= height) break;
       for (let col = 0; col <= row; col++) {
         const posOctant = _ShadowCasting.transformOctant(row, col, octant);
-        const posX = x2 + posOctant.x;
-        const posY = y2 + posOctant.y;
+        const posX = x + posOctant.x;
+        const posY = y + posOctant.y;
         if (posX < 0 || posX >= width || posY < 0 || posY >= height) break;
         if (fullShadow)
           this.map.setVisible(posX, posY, false);
@@ -568,187 +471,297 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
-// src/index.ts
-var map = new map_default(40, 40);
-for (let x2 = 0; x2 < 40; x2++) {
-  for (let y2 = 0; y2 < 40; y2++) {
-    if (x2 == 0 || y2 == 0 || x2 == 39 || y2 == 39)
-      map.set(x2, y2, tile_default.Wall);
+// src/graphics/color.ts
+var Color = class _Color {
+  r;
+  g;
+  b;
+  a;
+  constructor(r, g, b, a) {
+    this.r = r;
+    this.g = g;
+    this.b = b;
+    this.a = a;
   }
-}
-var pathfinding = new pathfinding_default(map);
-var shadowcasting = new shadowcasting_default(map);
-var sprites = new sprites_default(16, 16);
-var canvas = document.getElementById("canvas");
-var ctx = canvas.getContext("2d");
-function drawBlock(x2, y2, style) {
-  ctx.fillStyle = style;
-  ctx.fillRect(x2 * 16, y2 * 16, 16, 16);
-}
-function drawSpriteAbs(x2, y2, index, foreground) {
-  const image = sprites.get(index, color_default.White, foreground);
-  if (image) ctx.drawImage(image, x2, y2);
-}
-function drawSprite(x2, y2, index, foreground) {
-  drawSpriteAbs(x2 * 16, y2 * 16, index, foreground);
-}
-function drawTile(x2, y2) {
-  const visible = map.isVisible(x2, y2);
-  const tile = map.get(x2, y2);
-  if (visible) {
-    if (tile == tile_default.Empty) {
-      drawBlock(x2, y2, "white");
-    } else {
-      drawSprite(x2, y2, 1, color_default.Black);
-    }
-  } else {
-    if (map.isExplored(x2, y2)) {
-      if (tile == tile_default.Wall)
-        drawSprite(x2, y2, 1, color_default.Grey);
-      else
-        drawBlock(x2, y2, "grey");
-    } else {
-      drawBlock(x2, y2, "black");
-    }
+  equals(other) {
+    return this.r == other.r && this.g == other.g && this.b == other.b && this.a == other.a;
   }
-}
-var x = 16;
-var y = 16;
-var sx = 1;
-var sy = 1;
-var ox = 0;
-var oy = 0;
-var gx = 0;
-var gy = 0;
-var path = null;
-var keyZ = false;
-var keyX = false;
-function draw() {
-  for (let x2 = 0; x2 < 40; x2++) {
-    for (let y2 = 0; y2 < 40; y2++) {
-      drawTile(x2, y2);
-    }
+  static White = new _Color(255, 255, 255, 255);
+  static Black = new _Color(0, 0, 0, 255);
+  static Grey = new _Color(127, 127, 127, 255);
+  static Red = new _Color(255, 0, 0, 255);
+  static Blue = new _Color(0, 255, 0, 255);
+  static Green = new _Color(0, 0, 255, 255);
+  static Transparent = new _Color(0, 0, 0, 0);
+};
+var color_default = Color;
+
+// src/graphics/sprites.ts
+var Sprites = class _Sprites {
+  spriteWidth;
+  spriteHeight;
+  sprites = [];
+  recolors = /* @__PURE__ */ new Map();
+  constructor(spriteWidth, spriteHeight) {
+    this.spriteWidth = spriteWidth;
+    this.spriteHeight = spriteHeight;
   }
-  ctx.fillStyle = "green";
-  ctx.fillRect(gx * 16, gy * 16, 16, 16);
-  if (path) {
-    for (const p of path)
-      ctx.fillRect(p.x * 16, p.y * 16, 16, 16);
-  }
-  drawSpriteAbs(x, y, 0, color_default.Black);
-}
-canvas.addEventListener("mousedown", (event) => {
-  gx = Math.floor(event.offsetX / 16);
-  gy = Math.floor(event.offsetY / 16);
-  path = pathfinding.findPath(sx, sy, gx, gy);
-  if (path) path.reverse();
-});
-canvas.addEventListener("mousemove", (event) => {
-  gx = Math.floor(event.offsetX / 16);
-  gy = Math.floor(event.offsetY / 16);
-  if (keyZ) {
-    map.set(gx, gy, tile_default.Empty);
-    shadowcasting.refreshVisibility(sx, sy);
-  } else if (keyX) {
-    map.set(gx, gy, tile_default.Wall);
-    shadowcasting.refreshVisibility(sx, sy);
-  }
-});
-window.addEventListener("keydown", (event) => {
-  if (oy == 0) {
-    if (event.key == "w") oy = -16;
-    else if (event.key == "s") oy = 16;
-  }
-  if (ox == 0) {
-    if (event.key == "a") ox = -16;
-    else if (event.key == "d") ox = 16;
-  }
-  if (event.key == "z") {
-    keyZ = true;
-    map.set(gx, gy, tile_default.Empty);
-    shadowcasting.refreshVisibility(sx, sy);
-  } else if (event.key == "x") {
-    keyX = true;
-    map.set(gx, gy, tile_default.Wall);
-    shadowcasting.refreshVisibility(sx, sy);
-  }
-});
-window.addEventListener("keyup", (event) => {
-  if (event.key == "z") {
-    keyZ = false;
-  } else if (event.key == "x") {
-    keyX = false;
-  }
-});
-window.addEventListener("keypress", (event) => {
-  if (event.key == "r") {
-    map.reset();
-    shadowcasting.refreshVisibility(sx, sy);
-    draw();
-  }
-});
-sprites.loadFromURL("images/sprites.bmp", 32, 32).then(() => {
-  shadowcasting.refreshVisibility(sx, sy);
-  loop(0);
-}).catch((err) => console.error(err));
-var SPEED = 0.25;
-var lastTime = 0;
-function loop(time) {
-  const delta = lastTime == 0 ? 0 : time - lastTime;
-  lastTime = time;
-  if (path) {
-    if (path.length > 0) {
-      if (ox == 0 && oy == 0) {
-        const nextPos = path.pop();
-        if (nextPos.x > sx) ox = 16;
-        else if (nextPos.x < sx) ox = -16;
-        if (nextPos.y > sy) oy = 16;
-        else if (nextPos.y < sy) oy = -16;
+  async load(image, width, height) {
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const cols = Math.floor(width / spriteWidth);
+    const rows = Math.floor(height / spriteHeight);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const bitmap = await createImageBitmap(image, x * spriteWidth, y * spriteHeight, spriteWidth, spriteHeight);
+        this.sprites.push(bitmap);
       }
-    } else path = null;
-  }
-  if (ox > 0) {
-    const dist = delta * SPEED;
-    x += dist;
-    ox -= dist;
-    if (ox < 0.1) {
-      ox = 0;
-      sx += 1;
-      x = sx * 16;
-      shadowcasting.refreshVisibility(sx, sy);
-    }
-  } else if (ox < 0) {
-    const dist = delta * SPEED;
-    x -= dist;
-    ox += dist;
-    if (ox > -0.1) {
-      ox = 0;
-      sx -= 1;
-      x = sx * 16;
-      shadowcasting.refreshVisibility(sx, sy);
     }
   }
-  if (oy > 0) {
-    const dist = delta * SPEED;
-    y += dist;
-    oy -= dist;
-    if (oy < 0.1) {
-      oy = 0;
-      sy += 1;
-      y = sy * 16;
-      shadowcasting.refreshVisibility(sx, sy);
+  async loadFromURL(url, width, height) {
+    await fetch(url).then((response) => response.blob()).then((blob) => this.load(blob, width, height));
+  }
+  get(index, backgroundColor, foregroundColor) {
+    const recolors = this.recolors;
+    const hash = `${index},${_Sprites.colorHash(backgroundColor)},${_Sprites.colorHash(foregroundColor)}`;
+    const recoloredImage = recolors.get(hash);
+    if (recoloredImage) return recoloredImage;
+    const image = this.sprites[index];
+    if (image) {
+      const newImage = this.recolor(image, backgroundColor, foregroundColor);
+      recolors.set(hash, newImage);
+      return newImage;
     }
-  } else if (oy < 0) {
-    const dist = delta * SPEED;
-    y -= dist;
-    oy += dist;
-    if (oy > -0.1) {
-      oy = 0;
-      sy -= 1;
-      y = sy * 16;
-      shadowcasting.refreshVisibility(sx, sy);
+    return null;
+  }
+  static colorHash(c) {
+    return `${c.r},${c.g},${c.b},${c.a}`;
+  }
+  recolor(image, backgroundColor, foregroundColor) {
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const canvas = new OffscreenCanvas(spriteWidth, spriteHeight);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(image, 0, 0);
+    const imageData = ctx.getImageData(0, 0, spriteWidth, spriteHeight);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r == 255 && g == 255 && b == 255) {
+        data[i] = backgroundColor.r;
+        data[i + 1] = backgroundColor.g;
+        data[i + 2] = backgroundColor.b;
+        data[i + 3] = backgroundColor.a;
+      } else {
+        data[i] = foregroundColor.r;
+        data[i + 1] = foregroundColor.g;
+        data[i + 2] = foregroundColor.b;
+        data[i + 3] = foregroundColor.a;
+      }
+    }
+    ctx.clearRect(0, 0, 16, 16);
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.transferToImageBitmap();
+  }
+};
+var sprites_default = Sprites;
+
+// src/graphics/main.ts
+var Main = class {
+  running = false;
+  lastTime;
+  width = 20;
+  height = 20;
+  originalSpriteWidth = 16;
+  originalSpriteHeight = 16;
+  spriteWidth = 32;
+  spriteHeight = 32;
+  map = new map_default(this.width, this.height);
+  pathfinding = new pathfinding_default(this.map);
+  shadowcasting = new shadowcasting_default(this.map);
+  x = 1;
+  y = 1;
+  ax = this.spriteWidth;
+  ay = this.spriteHeight;
+  ox = 0;
+  oy = 0;
+  gx = 0;
+  gy = 0;
+  revPath = null;
+  mx = 0;
+  my = 0;
+  ctx;
+  sprites = new sprites_default(this.originalSpriteWidth, this.originalSpriteHeight);
+  animationSpeed = 0.25;
+  constructor() {
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        if (x == 0 || x == this.width - 1 || y == 0 || y == this.height - 1)
+          this.map.set(x, y, tile_default.Wall);
+        else if (x > 5 && x < 11 && y > 5 && y < 11)
+          this.map.set(x, y, tile_default.Wall);
+        if (x > 6 && x < 10 && y > 6 && y < 10)
+          this.map.set(x, y, tile_default.Empty);
+        if (x == 8 && y == 6)
+          this.map.set(x, y, tile_default.Empty);
+      }
     }
   }
-  draw();
-  requestAnimationFrame(loop);
-}
+  async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight) {
+    await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    this.ctx = ctx;
+    window.addEventListener("mousemove", (event) => this.handleMouseMove(event));
+    window.addEventListener("mousedown", (event) => this.handleMouseDown(event));
+  }
+  start() {
+    this.running = true;
+    requestAnimationFrame((time) => {
+      this.lastTime = time;
+      this.shadowcasting.refreshVisibility(this.x, this.y);
+      requestAnimationFrame((time2) => this.loop(time2));
+    });
+  }
+  stop() {
+    this.running = false;
+  }
+  handleMouseMove(event) {
+    this.mx = Math.floor(event.offsetX / this.spriteWidth);
+    this.my = Math.floor(event.offsetY / this.spriteHeight);
+  }
+  handleMouseDown(event) {
+    if (event.buttons == 1) {
+      const path = this.pathfinding.findPath(this.x, this.y, this.mx, this.my);
+      if (path) {
+        this.gx = this.mx;
+        this.gy = this.my;
+        path.reverse();
+        this.revPath = path;
+      }
+    }
+  }
+  loop(time) {
+    if (!this.running) return;
+    const delta = time - this.lastTime;
+    this.lastTime = time;
+    this.logic(delta);
+    this.draw();
+    requestAnimationFrame((time2) => this.loop(time2));
+  }
+  logic(delta) {
+    let x = this.x;
+    let y = this.y;
+    let ox = this.ox;
+    let oy = this.oy;
+    const path = this.revPath;
+    if (path) {
+      if (path.length > 0) {
+        if (ox == 0 && oy == 0) {
+          const nextPos = path.pop();
+          if (nextPos.x > x) ox = this.spriteWidth;
+          else if (nextPos.x < x) ox = -this.spriteWidth;
+          if (nextPos.y > y) oy = this.spriteHeight;
+          else if (nextPos.y < y) oy = -this.spriteHeight;
+        }
+      } else this.revPath = null;
+    }
+    if (ox > 0) {
+      const dist = delta * this.animationSpeed;
+      this.ax += dist;
+      ox -= dist;
+      if (ox < 0.1) {
+        ox = 0;
+        x += 1;
+        this.ax = x * this.spriteWidth;
+        this.shadowcasting.refreshVisibility(x, y);
+      }
+    } else if (ox < 0) {
+      const dist = delta * this.animationSpeed;
+      this.ax -= dist;
+      ox += dist;
+      if (ox > -0.1) {
+        ox = 0;
+        x -= 1;
+        this.ax = x * this.spriteWidth;
+        this.shadowcasting.refreshVisibility(x, y);
+      }
+    }
+    if (oy > 0) {
+      const dist = delta * this.animationSpeed;
+      this.ay += dist;
+      oy -= dist;
+      if (oy < 0.1) {
+        oy = 0;
+        y += 1;
+        this.ay = y * this.spriteHeight;
+        this.shadowcasting.refreshVisibility(x, y);
+      }
+    } else if (oy < 0) {
+      const dist = delta * this.animationSpeed;
+      this.ay -= dist;
+      oy += dist;
+      if (oy > -0.1) {
+        oy = 0;
+        y -= 1;
+        this.ay = y * this.spriteHeight;
+        this.shadowcasting.refreshVisibility(x, y);
+      }
+    }
+    this.x = x;
+    this.y = y;
+    this.ox = ox;
+    this.oy = oy;
+  }
+  draw() {
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        this.drawTile(x, y);
+      }
+    }
+    this.drawSpriteAbsolute(0, this.ax, this.ay, color_default.Black);
+    if (this.revPath)
+      this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
+    this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
+  }
+  drawTile(x, y) {
+    const map = this.map;
+    const visible = map.isVisible(x, y);
+    const tile = map.get(x, y);
+    if (visible) {
+      if (tile == tile_default.Empty) {
+        this.drawRect(x, y, "white");
+      } else {
+        this.drawSprite(1, x, y, color_default.Black);
+      }
+    } else {
+      if (map.isExplored(x, y)) {
+        if (tile == tile_default.Wall)
+          this.drawSprite(1, x, y, color_default.Grey);
+        else
+          this.drawRect(x, y, "grey");
+      } else {
+        this.drawRect(x, y, "black");
+      }
+    }
+  }
+  drawRect(x, y, style) {
+    this.ctx.fillStyle = style;
+    this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
+  }
+  drawSpriteAbsolute(index, x, y, foreground) {
+    const image = this.sprites.get(index, color_default.White, foreground);
+    if (image) this.ctx.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
+  }
+  drawSprite(index, x, y, foreground) {
+    this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground);
+  }
+};
+var main_default = Main;
+
+// src/index.ts
+var main = new main_default();
+main.initialize("canvas", "images/sprites.bmp", 32, 32).then(() => main.start()).catch((err) => console.error(err));

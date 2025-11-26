@@ -8,6 +8,7 @@ TODO:
 - [x] Shadow casting
 - [x] Sprites with re-coloring
 - [x] Basic animation
+- [ ] Add doors for interaction
 - [ ] Animation system
 - [ ] Turn-based system
 - [ ] NPCs
