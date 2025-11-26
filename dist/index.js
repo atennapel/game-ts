@@ -2,13 +2,21 @@
 var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Empty"] = 0] = "Empty";
   Tile2[Tile2["Wall"] = 1] = "Wall";
+  Tile2[Tile2["ClosedDoor"] = 2] = "ClosedDoor";
+  Tile2[Tile2["OpenDoor"] = 3] = "OpenDoor";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
   function isBlocked(tile) {
-    return tile == 1 /* Wall */;
+    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */;
   }
   Tile2.isBlocked = isBlocked;
+  function description(tile) {
+    if (tile == 2 /* ClosedDoor */) return "door (closed)";
+    else if (tile == 3 /* OpenDoor */) return "door (open)";
+    return null;
+  }
+  Tile2.description = description;
 })(Tile || (Tile = {}));
 var tile_default = Tile;
 
@@ -569,6 +577,24 @@ var Sprites = class _Sprites {
 var sprites_default = Sprites;
 
 // src/graphics/main.ts
+var Move = class {
+  position;
+  constructor(position) {
+    this.position = position;
+  }
+};
+var OpenDoor = class {
+  position;
+  constructor(position) {
+    this.position = position;
+  }
+};
+var CloseDoor = class {
+  position;
+  constructor(position) {
+    this.position = position;
+  }
+};
 var Main = class {
   running = false;
   lastTime;
@@ -589,7 +615,7 @@ var Main = class {
   oy = 0;
   gx = 0;
   gy = 0;
-  revPath = null;
+  actionStack = null;
   mx = 0;
   my = 0;
   ctx;
@@ -605,7 +631,7 @@ var Main = class {
         if (x > 6 && x < 10 && y > 6 && y < 10)
           this.map.set(x, y, tile_default.Empty);
         if (x == 8 && y == 6)
-          this.map.set(x, y, tile_default.Empty);
+          this.map.set(x, y, tile_default.ClosedDoor);
       }
     }
   }
@@ -615,8 +641,8 @@ var Main = class {
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     this.ctx = ctx;
-    window.addEventListener("mousemove", (event) => this.handleMouseMove(event));
-    window.addEventListener("mousedown", (event) => this.handleMouseDown(event));
+    canvas.addEventListener("mousemove", (event) => this.handleMouseMove(event));
+    canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event));
   }
   start() {
     this.running = true;
@@ -630,17 +656,66 @@ var Main = class {
     this.running = false;
   }
   handleMouseMove(event) {
-    this.mx = Math.floor(event.offsetX / this.spriteWidth);
-    this.my = Math.floor(event.offsetY / this.spriteHeight);
+    const mx = Math.floor(event.offsetX / this.spriteWidth);
+    const my = Math.floor(event.offsetY / this.spriteHeight);
+    this.mx = mx < 0 ? 0 : mx >= this.width ? this.width - 1 : mx;
+    this.my = my < 0 ? 0 : my >= this.height ? this.height - 1 : my;
   }
   handleMouseDown(event) {
-    if (event.buttons == 1) {
-      const path = this.pathfinding.findPath(this.x, this.y, this.mx, this.my);
-      if (path) {
-        this.gx = this.mx;
-        this.gy = this.my;
-        path.reverse();
-        this.revPath = path;
+    const mx = this.mx;
+    const my = this.my;
+    if (event.buttons == 4 || event.ctrlKey && event.buttons == 1) {
+      const tile = this.map.get(mx, my);
+      if (tile == tile_default.OpenDoor) {
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop();
+          const actions = path.map((p) => new Move(p));
+          actions.push(new CloseDoor(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else if (tile == tile_default.ClosedDoor) {
+        this.map.set(mx, my, tile_default.OpenDoor);
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        this.map.set(mx, my, tile_default.ClosedDoor);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop();
+          const actions = path.map((p) => new Move(p));
+          actions.push(new OpenDoor(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      }
+    } else if (event.buttons == 1) {
+      const tile = this.map.get(mx, my);
+      if (tile == tile_default.ClosedDoor) {
+        this.map.set(mx, my, tile_default.OpenDoor);
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        this.map.set(mx, my, tile_default.ClosedDoor);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop();
+          const actions = path.map((p) => new Move(p));
+          actions.push(new OpenDoor(last));
+          actions.push(new Move(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else {
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        if (path) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const actions = path.map((p) => new Move(p));
+          actions.reverse();
+          this.actionStack = actions;
+        }
       }
     }
   }
@@ -657,17 +732,29 @@ var Main = class {
     let y = this.y;
     let ox = this.ox;
     let oy = this.oy;
-    const path = this.revPath;
-    if (path) {
-      if (path.length > 0) {
+    let shouldRefreshVisiblity = false;
+    const actionStack = this.actionStack;
+    if (actionStack) {
+      if (actionStack.length > 0) {
         if (ox == 0 && oy == 0) {
-          const nextPos = path.pop();
-          if (nextPos.x > x) ox = this.spriteWidth;
-          else if (nextPos.x < x) ox = -this.spriteWidth;
-          if (nextPos.y > y) oy = this.spriteHeight;
-          else if (nextPos.y < y) oy = -this.spriteHeight;
+          const nextAction = actionStack.pop();
+          if (nextAction instanceof Move) {
+            const pos = nextAction.position;
+            if (pos.x > x) ox = this.spriteWidth;
+            else if (pos.x < x) ox = -this.spriteWidth;
+            if (pos.y > y) oy = this.spriteHeight;
+            else if (pos.y < y) oy = -this.spriteHeight;
+          } else if (nextAction instanceof OpenDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, tile_default.OpenDoor);
+            shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof CloseDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, tile_default.ClosedDoor);
+            shouldRefreshVisiblity = true;
+          }
         }
-      } else this.revPath = null;
+      } else this.actionStack = null;
     }
     if (ox > 0) {
       const dist = delta * this.animationSpeed;
@@ -677,7 +764,7 @@ var Main = class {
         ox = 0;
         x += 1;
         this.ax = x * this.spriteWidth;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     } else if (ox < 0) {
       const dist = delta * this.animationSpeed;
@@ -687,7 +774,7 @@ var Main = class {
         ox = 0;
         x -= 1;
         this.ax = x * this.spriteWidth;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     }
     if (oy > 0) {
@@ -698,7 +785,7 @@ var Main = class {
         oy = 0;
         y += 1;
         this.ay = y * this.spriteHeight;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     } else if (oy < 0) {
       const dist = delta * this.animationSpeed;
@@ -708,9 +795,11 @@ var Main = class {
         oy = 0;
         y -= 1;
         this.ay = y * this.spriteHeight;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     }
+    if (shouldRefreshVisiblity)
+      this.shadowcasting.refreshVisibility(x, y);
     this.x = x;
     this.y = y;
     this.ox = ox;
@@ -722,25 +811,40 @@ var Main = class {
         this.drawTile(x, y);
       }
     }
-    this.drawSpriteAbsolute(0, this.ax, this.ay, color_default.Black);
-    if (this.revPath)
+    this.drawSpriteAbsolute(0, this.ax, this.ay, color_default.Black, color_default.Transparent);
+    if (this.actionStack)
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
     this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
+    const tileText = tile_default.description(this.map.get(this.mx, this.my));
+    if (tileText) {
+      this.ctx.font = "12px monospace";
+      this.ctx.fillStyle = "white";
+      this.ctx.fillRect(0, 0, tileText.length * 8, 16);
+      this.ctx.fillStyle = "black";
+      this.ctx.fillText(tileText, 5, 10);
+    }
   }
   drawTile(x, y) {
     const map = this.map;
     const visible = map.isVisible(x, y);
     const tile = map.get(x, y);
     if (visible) {
-      if (tile == tile_default.Empty) {
-        this.drawRect(x, y, "white");
-      } else {
+      if (tile == tile_default.Wall)
         this.drawSprite(1, x, y, color_default.Black);
-      }
+      else if (tile == tile_default.ClosedDoor)
+        this.drawSprite(2, x, y, color_default.Black);
+      else if (tile == tile_default.OpenDoor)
+        this.drawSprite(3, x, y, color_default.Black);
+      else
+        this.drawRect(x, y, "white");
     } else {
       if (map.isExplored(x, y)) {
         if (tile == tile_default.Wall)
           this.drawSprite(1, x, y, color_default.Grey);
+        else if (tile == tile_default.ClosedDoor)
+          this.drawSprite(2, x, y, color_default.Grey);
+        else if (tile == tile_default.OpenDoor)
+          this.drawSprite(3, x, y, color_default.Grey);
         else
           this.drawRect(x, y, "grey");
       } else {
@@ -752,8 +856,8 @@ var Main = class {
     this.ctx.fillStyle = style;
     this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
   }
-  drawSpriteAbsolute(index, x, y, foreground) {
-    const image = this.sprites.get(index, color_default.White, foreground);
+  drawSpriteAbsolute(index, x, y, foreground, background = color_default.White) {
+    const image = this.sprites.get(index, background, foreground);
     if (image) this.ctx.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
   drawSprite(index, x, y, foreground) {

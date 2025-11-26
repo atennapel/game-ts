@@ -6,6 +6,32 @@ import Tile from "../logic/tile";
 import Color from "./color";
 import Sprites from "./sprites";
 
+interface Action { }
+
+class Move implements Action {
+  readonly position: Pos;
+
+  constructor(position: Pos) {
+    this.position = position;
+  }
+}
+
+class OpenDoor implements Action {
+  readonly position: Pos;
+
+  constructor(position: Pos) {
+    this.position = position;
+  }
+}
+
+class CloseDoor implements Action {
+  readonly position: Pos;
+
+  constructor(position: Pos) {
+    this.position = position;
+  }
+}
+
 class Main {
   private running: boolean = false;
   private lastTime: DOMHighResTimeStamp;
@@ -29,7 +55,7 @@ class Main {
   private oy: number = 0;
   private gx: number = 0;
   private gy: number = 0;
-  private revPath: Pos[] | null = null;
+  private actionStack: Action[] | null = null;
 
   private mx: number = 0;
   private my: number = 0;
@@ -48,7 +74,7 @@ class Main {
         if (x > 6 && x < 10 && y > 6 && y < 10)
           this.map.set(x, y, Tile.Empty);
         if (x == 8 && y == 6)
-          this.map.set(x, y, Tile.Empty);
+          this.map.set(x, y, Tile.ClosedDoor);
       }
     }
   }
@@ -61,8 +87,8 @@ class Main {
     ctx.imageSmoothingEnabled = false;
     this.ctx = ctx;
 
-    window.addEventListener("mousemove", event => this.handleMouseMove(event));
-    window.addEventListener("mousedown", event => this.handleMouseDown(event));
+    canvas.addEventListener("mousemove", event => this.handleMouseMove(event));
+    canvas.addEventListener("mousedown", event => this.handleMouseDown(event));
   }
 
   start(): void {
@@ -79,18 +105,69 @@ class Main {
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    this.mx = Math.floor(event.offsetX / this.spriteWidth);
-    this.my = Math.floor(event.offsetY / this.spriteHeight);
+    const mx = Math.floor(event.offsetX / this.spriteWidth);
+    const my = Math.floor(event.offsetY / this.spriteHeight);
+    this.mx = mx < 0 ? 0 : mx >= this.width ? this.width - 1 : mx;
+    this.my = my < 0 ? 0 : my >= this.height ? this.height - 1 : my;
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    if (event.buttons == 1) {
-      const path = this.pathfinding.findPath(this.x, this.y, this.mx, this.my);
-      if (path) {
-        this.gx = this.mx;
-        this.gy = this.my;
-        path.reverse();
-        this.revPath = path;
+    const mx = this.mx;
+    const my = this.my;
+    if (event.buttons == 4 || (event.ctrlKey && event.buttons == 1)) {
+      // alternative action
+      const tile = this.map.get(mx, my);
+      if (tile == Tile.OpenDoor) {
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop()!;
+          const actions = path.map(p => new Move(p));
+          actions.push(new CloseDoor(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else if (tile == Tile.ClosedDoor) {
+        this.map.set(mx, my, Tile.OpenDoor);
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        this.map.set(mx, my, Tile.ClosedDoor);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop()!;
+          const actions = path.map(p => new Move(p));
+          actions.push(new OpenDoor(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      }
+    } else if (event.buttons == 1) {
+      // main action
+      const tile = this.map.get(mx, my);
+      if (tile == Tile.ClosedDoor) {
+        this.map.set(mx, my, Tile.OpenDoor);
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        this.map.set(mx, my, Tile.ClosedDoor);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop()!;
+          const actions = path.map(p => new Move(p));
+          actions.push(new OpenDoor(last));
+          actions.push(new Move(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else {
+        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        if (path) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const actions = path.map(p => new Move(p));
+          actions.reverse();
+          this.actionStack = actions;
+        }
       }
     }
   }
@@ -113,17 +190,30 @@ class Main {
     let ox = this.ox;
     let oy = this.oy;
 
-    const path = this.revPath;
-    if (path) {
-      if (path.length > 0) {
+    let shouldRefreshVisiblity = false;
+
+    const actionStack = this.actionStack;
+    if (actionStack) {
+      if (actionStack.length > 0) {
         if (ox == 0 && oy == 0) {
-          const nextPos = path.pop()!;
-          if (nextPos.x > x) ox = this.spriteWidth;
-          else if (nextPos.x < x) ox = -this.spriteWidth;
-          if (nextPos.y > y) oy = this.spriteHeight;
-          else if (nextPos.y < y) oy = -this.spriteHeight;
+          const nextAction = actionStack.pop()!;
+          if (nextAction instanceof Move) {
+            const pos = nextAction.position;
+            if (pos.x > x) ox = this.spriteWidth;
+            else if (pos.x < x) ox = -this.spriteWidth;
+            if (pos.y > y) oy = this.spriteHeight;
+            else if (pos.y < y) oy = -this.spriteHeight;
+          } else if (nextAction instanceof OpenDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, Tile.OpenDoor);
+            shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof CloseDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, Tile.ClosedDoor);
+            shouldRefreshVisiblity = true;
+          }
         }
-      } else this.revPath = null;
+      } else this.actionStack = null;
     }
 
     if (ox > 0) {
@@ -134,7 +224,7 @@ class Main {
         ox = 0;
         x += 1;
         this.ax = x * this.spriteWidth;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     } else if (ox < 0) {
       const dist = delta * this.animationSpeed;
@@ -144,7 +234,7 @@ class Main {
         ox = 0;
         x -= 1;
         this.ax = x * this.spriteWidth;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     }
     if (oy > 0) {
@@ -155,7 +245,7 @@ class Main {
         oy = 0;
         y += 1;
         this.ay = y * this.spriteHeight;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     } else if (oy < 0) {
       const dist = delta * this.animationSpeed;
@@ -165,9 +255,12 @@ class Main {
         oy = 0;
         y -= 1;
         this.ay = y * this.spriteHeight;
-        this.shadowcasting.refreshVisibility(x, y);
+        shouldRefreshVisiblity = true;
       }
     }
+
+    if (shouldRefreshVisiblity)
+      this.shadowcasting.refreshVisibility(x, y);
 
     this.x = x;
     this.y = y;
@@ -184,15 +277,24 @@ class Main {
     }
 
     // draw player
-    this.drawSpriteAbsolute(0, this.ax, this.ay, Color.Black);
+    this.drawSpriteAbsolute(0, this.ax, this.ay, Color.Black, Color.Transparent);
 
     // draw goal
-    if (this.revPath)
+    if (this.actionStack)
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
 
     // draw mouse indicator
     this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
 
+    // draw description text
+    const tileText = Tile.description(this.map.get(this.mx, this.my));
+    if (tileText) {
+      this.ctx.font = "12px monospace";
+      this.ctx.fillStyle = "white";
+      this.ctx.fillRect(0, 0, tileText.length * 8, 16);
+      this.ctx.fillStyle = "black";
+      this.ctx.fillText(tileText, 5, 10);
+    }
   }
 
   private drawTile(x: number, y: number): void {
@@ -200,15 +302,22 @@ class Main {
     const visible = map.isVisible(x, y);
     const tile = map.get(x, y);
     if (visible) {
-      if (tile == Tile.Empty) {
-        this.drawRect(x, y, "white");
-      } else {
+      if (tile == Tile.Wall)
         this.drawSprite(1, x, y, Color.Black);
-      }
+      else if (tile == Tile.ClosedDoor)
+        this.drawSprite(2, x, y, Color.Black);
+      else if (tile == Tile.OpenDoor)
+        this.drawSprite(3, x, y, Color.Black);
+      else
+        this.drawRect(x, y, "white");
     } else {
       if (map.isExplored(x, y)) {
         if (tile == Tile.Wall)
           this.drawSprite(1, x, y, Color.Grey);
+        else if (tile == Tile.ClosedDoor)
+          this.drawSprite(2, x, y, Color.Grey);
+        else if (tile == Tile.OpenDoor)
+          this.drawSprite(3, x, y, Color.Grey);
         else
           this.drawRect(x, y, "grey");
       } else {
@@ -222,8 +331,8 @@ class Main {
     this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
   }
 
-  private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color) {
-    const image = this.sprites.get(index, Color.White, foreground);
+  private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color, background: Color = Color.White) {
+    const image = this.sprites.get(index, background, foreground);
     if (image) this.ctx.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
 

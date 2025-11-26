@@ -8,8 +8,8 @@ TODO:
 - [x] Shadow casting
 - [x] Sprites with re-coloring
 - [x] Basic animation
-- [ ] Add doors for interaction
-- [ ] Animation system
+- [x] Add doors for interaction
+- [ ] Move player and animation data in separate classes
 - [ ] Turn-based system
 - [ ] NPCs
 
