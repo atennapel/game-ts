@@ -701,6 +701,8 @@ var Main = class {
   gx = 0;
   gy = 0;
   actionStack = null;
+  monster = new animatedentity_default(2, 2, this.spriteWidth, this.spriteHeight);
+  monsterActionStack = null;
   mx = 0;
   my = 0;
   ctx;
@@ -752,6 +754,7 @@ var Main = class {
   handleMouseDown(event) {
     const mx = this.mx;
     const my = this.my;
+    if (!this.map.isExplored(mx, my)) return;
     if (event.buttons == 4 || event.ctrlKey && event.buttons == 1) {
       const tile = this.map.get(mx, my);
       if (tile == tile_default.OpenDoor) {
@@ -860,6 +863,76 @@ var Main = class {
         } else this.actionStack = null;
       }
     }
+    if (!this.monster.isAnimating()) {
+      const actionStack = this.monsterActionStack;
+      if (actionStack) {
+        if (actionStack.length > 0) {
+          const nextAction = actionStack.pop();
+          if (nextAction instanceof Move) {
+            const pos = nextAction.position;
+            this.monster.move(pos.x, pos.y);
+          } else if (nextAction instanceof OpenDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, tile_default.OpenDoor);
+            shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof CloseDoor) {
+            const pos = nextAction.position;
+            this.map.set(pos.x, pos.y, tile_default.ClosedDoor);
+            shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof Bump) {
+            const pos = nextAction.position;
+            this.monster.bump(pos.x, pos.y, nextAction.ratio);
+          }
+        } else this.monsterActionStack = null;
+      } else {
+        const x = Math.floor(Math.random() * this.width);
+        const y = Math.floor(Math.random() * this.height);
+        const tile = this.map.get(x, y);
+        if (tile == tile_default.Empty) {
+          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          if (path) {
+            const actions = path.map((p) => new Move(p));
+            actions.reverse();
+            this.monsterActionStack = actions;
+          }
+        } else if (tile == tile_default.Wall) {
+          this.map.set(x, y, tile_default.Empty);
+          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          this.map.set(x, y, tile_default.Wall);
+          if (path && path.length > 0) {
+            const last = path.pop();
+            const actions = path.map((p) => new Move(p));
+            actions.push(new Bump(last, 0.25));
+            actions.reverse();
+            this.monsterActionStack = actions;
+          }
+        } else if (tile == tile_default.ClosedDoor) {
+          this.map.set(x, y, tile_default.Empty);
+          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          this.map.set(x, y, tile_default.Wall);
+          if (path && path.length > 0) {
+            const last = path.pop();
+            const actions = path.map((p) => new Move(p));
+            actions.push(new Bump(last, 0.25));
+            actions.push(new OpenDoor(last));
+            actions.push(new Move(last));
+            actions.reverse();
+            this.monsterActionStack = actions;
+          }
+        } else if (tile == tile_default.OpenDoor) {
+          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          if (path && path.length > 0) {
+            const last = path.pop();
+            const actions = path.map((p) => new Move(p));
+            actions.push(new Bump(last, 0.25));
+            actions.push(new CloseDoor(last));
+            actions.reverse();
+            this.monsterActionStack = actions;
+          }
+        }
+      }
+    }
+    this.monster.update(delta);
     shouldRefreshVisiblity = shouldRefreshVisiblity || this.player.update(delta);
     if (shouldRefreshVisiblity)
       this.refreshVisibility();
@@ -870,6 +943,8 @@ var Main = class {
         this.drawTile(x, y);
       }
     }
+    if (this.map.isVisible(this.monster.x, this.monster.y))
+      this.drawSpriteAbsolute(0, this.monster.absoluteX, this.monster.absoluteY, color_default.Red, color_default.Transparent);
     this.drawSpriteAbsolute(0, this.player.absoluteX, this.player.absoluteY, color_default.Black, color_default.Transparent);
     if (this.actionStack)
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");

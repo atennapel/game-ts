@@ -11,7 +11,7 @@ TODO:
 - [x] Add doors for interaction
 - [x] Move player animation in separate class
 - [x] Bumping animation
-- [ ] NPCs
+- [x] NPCs
 - [ ] Turn-based system
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 
