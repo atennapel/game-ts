@@ -1018,6 +1018,7 @@ var Main = class {
   sprites = null;
   running = false;
   lastTime = 0;
+  fps = 0;
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
     this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -1067,6 +1068,7 @@ var Main = class {
     if (!this.running) return;
     const delta = time - this.lastTime;
     this.lastTime = time;
+    this.fps = 1e3 / delta;
     this.logic(delta);
     this.draw();
     requestAnimationFrame((time2) => this.loop(time2));
@@ -1098,6 +1100,12 @@ var Main = class {
       this.ctx.fillStyle = "black";
       this.ctx.fillText(tileText, 5, 10);
     }
+    const fpsText = `fps: ${this.fps.toFixed(2)}`;
+    this.ctx.font = "12px monospace";
+    this.ctx.fillStyle = "white";
+    this.ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    this.ctx.fillStyle = "black";
+    this.ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
   }
   drawTile(x, y) {
     const map = this.map;

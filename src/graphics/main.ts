@@ -33,6 +33,7 @@ class Main {
 
   private running: boolean = false;
   private lastTime: DOMHighResTimeStamp = 0;
+  private fps: number = 0;
 
   async initialize(
     canvasId: string,
@@ -97,6 +98,7 @@ class Main {
     if (!this.running) return;
     const delta = time - this.lastTime;
     this.lastTime = time;
+    this.fps = 1000 / delta;
 
     this.logic(delta);
 
@@ -142,6 +144,14 @@ class Main {
       this.ctx!.fillStyle = "black";
       this.ctx!.fillText(tileText, 5, 10);
     }
+
+    // draw fps
+    const fpsText = `fps: ${this.fps.toFixed(2)}`;
+    this.ctx!.font = "12px monospace"
+    this.ctx!.fillStyle = "white";
+    this.ctx!.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    this.ctx!.fillStyle = "black";
+    this.ctx!.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
   }
 
   private drawTile(x: number, y: number): void {
