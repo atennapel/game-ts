@@ -834,7 +834,9 @@ var AnimatedEntity = class {
         return;
       }
     }
-    const change = delta * this.animationSpeed;
+    let change = delta * this.animationSpeed;
+    if ((ax < gx || ax > gx) && (ay < gy || ay > gy))
+      change *= Math.SQRT1_2;
     if (ax < gx) {
       ax += change;
       if (ax > gx) ax = gx;
@@ -853,7 +855,6 @@ var AnimatedEntity = class {
     this.goalY = gy;
     this.absoluteX = ax;
     this.absoluteY = ay;
-    return;
   }
   resetActions() {
     this.entity.resetActions();
