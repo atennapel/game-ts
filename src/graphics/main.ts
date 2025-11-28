@@ -1,47 +1,17 @@
+import Action from "../logic/actions/action";
+import BumpAction from "../logic/actions/bumpaction";
+import CloseDoorAction from "../logic/actions/closedooraction";
+import MoveAction from "../logic/actions/moveaction";
+import OpenDoorAction from "../logic/actions/opendooraction";
+import Game from "../logic/game";
 import Map from "../logic/map";
 import PathFinding from "../logic/pathfinding";
-import Pos from "../logic/pos";
 import ShadowCasting from "../logic/shadowcasting";
 import Tile from "../logic/tile";
+import World from "../logic/world";
 import AnimatedEntity from "./animatedentity";
 import Color from "./color";
 import Sprites from "./sprites";
-
-interface Action { }
-
-class Move implements Action {
-  readonly position: Pos;
-
-  constructor(position: Pos) {
-    this.position = position;
-  }
-}
-
-class OpenDoor implements Action {
-  readonly position: Pos;
-
-  constructor(position: Pos) {
-    this.position = position;
-  }
-}
-
-class CloseDoor implements Action {
-  readonly position: Pos;
-
-  constructor(position: Pos) {
-    this.position = position;
-  }
-}
-
-class Bump implements Action {
-  readonly position: Pos;
-  readonly ratio: number;
-
-  constructor(position: Pos, ratio: number) {
-    this.position = position;
-    this.ratio = ratio;
-  }
-}
 
 class Main {
   private running: boolean = false;
@@ -54,16 +24,16 @@ class Main {
   private readonly spriteWidth: number = 32;
   private readonly spriteHeight: number = 32;
 
-  private readonly map: Map = new Map(this.width, this.height);
-  private readonly pathfinding: PathFinding = new PathFinding(this.map);
-  private readonly shadowcasting: ShadowCasting = new ShadowCasting(this.map);
+  private readonly game: Game = new Game(this.width, this.height);
+  private readonly world: World = this.game.world;
+  private readonly map: Map = this.world.map;
 
-  private player: AnimatedEntity = new AnimatedEntity(1, 1, this.spriteWidth, this.spriteHeight);
+  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, true);
   private gx: number = 0;
   private gy: number = 0;
   private actionStack: Action[] | null = null;
 
-  private monster: AnimatedEntity = new AnimatedEntity(2, 2, this.spriteWidth, this.spriteHeight);
+  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight);
   private monsterActionStack: Action[] | null = null;
 
   private mx: number = 0;
@@ -71,22 +41,6 @@ class Main {
 
   private ctx: CanvasRenderingContext2D;
   private readonly sprites: Sprites = new Sprites(this.originalSpriteWidth, this.originalSpriteHeight);
-  private readonly animationSpeed: number = 0.25;
-
-  constructor() {
-    for (let x = 0; x < this.width; x++) {
-      for (let y = 0; y < this.height; y++) {
-        if (x == 0 || x == this.width - 1 || y == 0 || y == this.height - 1)
-          this.map.set(x, y, Tile.Wall);
-        else if (x > 5 && x < 11 && y > 5 && y < 11)
-          this.map.set(x, y, Tile.Wall);
-        if (x > 6 && x < 10 && y > 6 && y < 10)
-          this.map.set(x, y, Tile.Empty);
-        if (x == 8 && y == 6)
-          this.map.set(x, y, Tile.ClosedDoor);
-      }
-    }
-  }
 
   async initialize(canvasId: string, spriteSheetUrl: string, spriteSheetWidth: number, spriteSheetHeight: number): Promise<void> {
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -98,10 +52,6 @@ class Main {
 
     canvas.addEventListener("mousemove", event => this.handleMouseMove(event));
     canvas.addEventListener("mousedown", event => this.handleMouseDown(event));
-  }
-
-  refreshVisibility() {
-    this.shadowcasting.refreshVisibility(this.player.x, this.player.y);
   }
 
   start(): void {
@@ -132,28 +82,26 @@ class Main {
       // alternative action
       const tile = this.map.get(mx, my);
       if (tile == Tile.OpenDoor) {
-        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
           const last = path.pop()!;
-          const actions = path.map(p => new Move(p));
-          actions.push(new Bump(last, 0.25));
-          actions.push(new CloseDoor(last));
+          const actions = path.map(p => new MoveAction(p));
+          actions.push(new CloseDoorAction(last));
           actions.reverse();
           this.actionStack = actions;
         }
       } else if (tile == Tile.ClosedDoor) {
         this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, Tile.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
           const last = path.pop()!;
-          const actions = path.map(p => new Move(p));
-          actions.push(new Bump(last, 0.25));
-          actions.push(new OpenDoor(last));
+          const actions = path.map(p => new MoveAction(p));
+          actions.push(new OpenDoorAction(last));
           actions.reverse();
           this.actionStack = actions;
         }
@@ -163,38 +111,37 @@ class Main {
       const tile = this.map.get(mx, my);
       if (tile == Tile.ClosedDoor) {
         this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, Tile.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
           const last = path.pop()!;
-          const actions = path.map(p => new Move(p));
-          actions.push(new Bump(last, 0.25));
-          actions.push(new OpenDoor(last));
-          actions.push(new Move(last));
+          const actions = path.map(p => new MoveAction(p));
+          actions.push(new OpenDoorAction(last));
+          actions.push(new MoveAction(last));
           actions.reverse();
           this.actionStack = actions;
         }
       } else if (tile == Tile.Wall) {
         this.map.set(mx, my, Tile.Empty);
-        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, Tile.Wall);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
           const last = path.pop()!;
-          const actions = path.map(p => new Move(p));
-          actions.push(new Bump(last, 0.25));
+          const actions = path.map(p => new MoveAction(p));
+          actions.push(new BumpAction(last));
           actions.reverse();
           this.actionStack = actions;
         }
       } else {
-        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
         if (path) {
           this.gx = this.mx;
           this.gy = this.my;
-          const actions = path.map(p => new Move(p));
+          const actions = path.map(p => new MoveAction(p));
           actions.reverse();
           this.actionStack = actions;
         }
@@ -203,7 +150,7 @@ class Main {
   }
 
   private initLoop(): void {
-    this.refreshVisibility();
+    this.game.refreshVisibility();
     this.draw();
   }
 
@@ -220,95 +167,65 @@ class Main {
   }
 
   private logic(delta: number): void {
-    let shouldRefreshVisiblity = false;
-
+    // perform player actions
     if (!this.player.isAnimating()) {
       const actionStack = this.actionStack;
       if (actionStack) {
         if (actionStack.length > 0) {
           const nextAction = actionStack.pop()!;
-          if (nextAction instanceof Move) {
-            const pos = nextAction.position;
-            this.player.move(pos.x, pos.y);
-          } else if (nextAction instanceof OpenDoor) {
-            const pos = nextAction.position;
-            this.map.set(pos.x, pos.y, Tile.OpenDoor);
-            shouldRefreshVisiblity = true;
-          } else if (nextAction instanceof CloseDoor) {
-            const pos = nextAction.position;
-            this.map.set(pos.x, pos.y, Tile.ClosedDoor);
-            shouldRefreshVisiblity = true;
-          } else if (nextAction instanceof Bump) {
-            const pos = nextAction.position;
-            this.player.bump(pos.x, pos.y, nextAction.ratio);
-          }
+          nextAction.perform(this.game, this.player);
         } else this.actionStack = null;
       }
     }
 
+    // perform and plan monster actions
     if (!this.monster.isAnimating()) {
       const actionStack = this.monsterActionStack;
       if (actionStack) {
         if (actionStack.length > 0) {
           const nextAction = actionStack.pop()!;
-          if (nextAction instanceof Move) {
-            const pos = nextAction.position;
-            this.monster.move(pos.x, pos.y);
-          } else if (nextAction instanceof OpenDoor) {
-            const pos = nextAction.position;
-            this.map.set(pos.x, pos.y, Tile.OpenDoor);
-            shouldRefreshVisiblity = true;
-          } else if (nextAction instanceof CloseDoor) {
-            const pos = nextAction.position;
-            this.map.set(pos.x, pos.y, Tile.ClosedDoor);
-            shouldRefreshVisiblity = true;
-          } else if (nextAction instanceof Bump) {
-            const pos = nextAction.position;
-            this.monster.bump(pos.x, pos.y, nextAction.ratio);
-          }
+          nextAction.perform(this.game, this.monster);
         } else this.monsterActionStack = null;
       } else {
         const x = Math.floor(Math.random() * this.width);
         const y = Math.floor(Math.random() * this.height);
         const tile = this.map.get(x, y);
         if (tile == Tile.Empty) {
-          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
           if (path) {
-            const actions = path.map(p => new Move(p));
+            const actions = path.map(p => new MoveAction(p));
             actions.reverse();
             this.monsterActionStack = actions;
           }
         } else if (tile == Tile.Wall) {
           this.map.set(x, y, Tile.Empty);
-          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
           this.map.set(x, y, Tile.Wall);
           if (path && path.length > 0) {
             const last = path.pop()!;
-            const actions = path.map(p => new Move(p));
-            actions.push(new Bump(last, 0.25));
+            const actions = path.map(p => new MoveAction(p));
+            actions.push(new BumpAction(last));
             actions.reverse();
             this.monsterActionStack = actions;
           }
         } else if (tile == Tile.ClosedDoor) {
           this.map.set(x, y, Tile.Empty);
-          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
           this.map.set(x, y, Tile.Wall);
           if (path && path.length > 0) {
             const last = path.pop()!;
-            const actions = path.map(p => new Move(p));
-            actions.push(new Bump(last, 0.25));
-            actions.push(new OpenDoor(last));
-            actions.push(new Move(last));
+            const actions = path.map(p => new MoveAction(p));
+            actions.push(new OpenDoorAction(last));
+            actions.push(new MoveAction(last));
             actions.reverse();
             this.monsterActionStack = actions;
           }
         } else if (tile == Tile.OpenDoor) {
-          const path = this.pathfinding.findPath(this.monster.x, this.monster.y, x, y);
+          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
           if (path && path.length > 0) {
             const last = path.pop()!;
-            const actions = path.map(p => new Move(p));
-            actions.push(new Bump(last, 0.25));
-            actions.push(new CloseDoor(last));
+            const actions = path.map(p => new MoveAction(p));
+            actions.push(new CloseDoorAction(last));
             actions.reverse();
             this.monsterActionStack = actions;
           }
@@ -318,10 +235,7 @@ class Main {
 
     // update animations
     this.monster.update(delta);
-    shouldRefreshVisiblity = shouldRefreshVisiblity || this.player.update(delta);
-
-    if (shouldRefreshVisiblity)
-      this.refreshVisibility();
+    this.player.update(delta);
   }
 
   private draw(): void {
