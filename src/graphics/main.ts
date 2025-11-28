@@ -12,8 +12,6 @@ import Sprites from "./sprites";
 class Main {
   private readonly width: number = 20;
   private readonly height: number = 20;
-  private readonly originalSpriteWidth: number = 16;
-  private readonly originalSpriteHeight: number = 16;
   private readonly spriteWidth: number = 32;
   private readonly spriteHeight: number = 32;
 
@@ -21,8 +19,9 @@ class Main {
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
-  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, 0, Color.Black);
-  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight, 0, Color.Red);
+  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
+  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
+  private fire: AnimatedEntity = new AnimatedEntity(this.world.fire, this.spriteWidth, this.spriteHeight, [4, 5, 6, 7], [Color.Red, new Color(155, 0, 0, 255)]);
 
   private mx: number = 0;
   private my: number = 0;
@@ -30,12 +29,19 @@ class Main {
   private gy: number = 0;
 
   private ctx: CanvasRenderingContext2D | null = null;
-  private readonly sprites: Sprites = new Sprites(this.originalSpriteWidth, this.originalSpriteHeight);
+  private sprites: Sprites | null = null;
 
   private running: boolean = false;
   private lastTime: DOMHighResTimeStamp = 0;
 
-  async initialize(canvasId: string, spriteSheetUrl: string, spriteSheetWidth: number, spriteSheetHeight: number): Promise<void> {
+  async initialize(
+    canvasId: string,
+    spriteSheetUrl: string,
+    spriteSheetWidth: number,
+    spriteSheetHeight: number,
+    originalSpriteWidth: number,
+    originalSpriteHeight: number): Promise<void> {
+    this.sprites = new Sprites(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
 
     const canvas = <HTMLCanvasElement>document.getElementById(canvasId);
@@ -101,6 +107,7 @@ class Main {
 
   private logic(delta: number): void {
     this.player.update(this.game, delta);
+    this.fire.update(this.game, delta);
     this.monster.update(this.game, delta);
   }
 
@@ -113,6 +120,8 @@ class Main {
     }
 
     // draw entities
+    if (this.map.isVisible(this.fire.x, this.fire.y))
+      this.drawEntity(this.fire);
     if (this.map.isVisible(this.monster.x, this.monster.y))
       this.drawEntity(this.monster);
     this.drawEntity(this.player);
@@ -170,7 +179,7 @@ class Main {
   }
 
   private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color, background: Color = Color.White): void {
-    const image = this.sprites.get(index, background, foreground);
+    const image = this.sprites!.get(index, background, foreground);
     if (image) this.ctx!.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
 

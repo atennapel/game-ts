@@ -1,5 +1,6 @@
 import NPC from "./entities/npc";
 import Player from "./entities/player";
+import StaticEntity from "./entities/staticentity";
 import Map from "./map";
 import Tile from "./tile";
 
@@ -7,11 +8,13 @@ class World {
   readonly map: Map;
   readonly player: Player;
   readonly npc: NPC;
+  readonly fire: StaticEntity;
 
   constructor(width: number, height: number) {
     this.map = new Map(width, height);
     this.player = new Player(1, 1);
     this.npc = new NPC(2, 2);
+    this.fire = new StaticEntity(10, 4);
 
     // initialize a map for testing
     for (let x = 0; x < width; x++) {

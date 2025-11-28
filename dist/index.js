@@ -659,6 +659,16 @@ var Player = class extends entity_default {
 };
 var player_default = Player;
 
+// src/logic/entities/staticentity.ts
+var StaticEntity = class extends entity_default {
+  isPlayer() {
+    return false;
+  }
+  decideNextAction(game) {
+  }
+};
+var staticentity_default = StaticEntity;
+
 // src/util.ts
 function array2d(width, height, value) {
   const result = new Array(width);
@@ -725,10 +735,12 @@ var World = class {
   map;
   player;
   npc;
+  fire;
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
     this.npc = new npc_default(2, 2);
+    this.fire = new staticentity_default(10, 4);
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
@@ -778,9 +790,13 @@ var AnimatedEntity = class {
   bumping = false;
   animationSpeed = 0.25;
   bumpRatio = 0.25;
-  sprite;
-  color;
-  constructor(entity, spriteWidth, spriteHeight, sprite, color) {
+  spriteCycleSpeed = 100;
+  sprites;
+  colors;
+  cycles;
+  spriteIndex = 0;
+  spriteCycleAcc = 0;
+  constructor(entity, spriteWidth, spriteHeight, sprites, colors) {
     this.entity = entity;
     this.absoluteX = entity.x * spriteWidth;
     this.absoluteY = entity.y * spriteHeight;
@@ -788,14 +804,21 @@ var AnimatedEntity = class {
     this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
-    this.sprite = sprite;
-    this.color = color;
+    this.sprites = sprites;
+    this.colors = colors;
+    this.cycles = Math.max(sprites.length, colors.length);
   }
   get x() {
     return this.entity.x;
   }
   get y() {
     return this.entity.y;
+  }
+  get sprite() {
+    return this.sprites[this.spriteIndex % this.sprites.length];
+  }
+  get color() {
+    return this.colors[this.spriteIndex % this.colors.length];
   }
   isPlayer() {
     return this.entity.isPlayer();
@@ -817,6 +840,13 @@ var AnimatedEntity = class {
     this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
   }
   update(game, delta) {
+    this.spriteCycleAcc += delta;
+    if (this.spriteCycleAcc >= this.spriteCycleSpeed) {
+      this.spriteCycleAcc = 0;
+      this.spriteIndex++;
+      if (this.spriteIndex >= this.cycles)
+        this.spriteIndex = 0;
+    }
     if (!this.animating && !this.entity.takeTurn(game, this)) return;
     let gx = this.goalX;
     let gy = this.goalY;
@@ -972,24 +1002,24 @@ var sprites_default = Sprites;
 var Main = class {
   width = 20;
   height = 20;
-  originalSpriteWidth = 16;
-  originalSpriteHeight = 16;
   spriteWidth = 32;
   spriteHeight = 32;
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
-  player = new animatedentity_default(this.world.player, this.spriteWidth, this.spriteHeight, 0, color_default.Black);
-  monster = new animatedentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, 0, color_default.Red);
+  player = new animatedentity_default(this.world.player, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
+  monster = new animatedentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
+  fire = new animatedentity_default(this.world.fire, this.spriteWidth, this.spriteHeight, [4, 5, 6, 7], [color_default.Red, new color_default(155, 0, 0, 255)]);
   mx = 0;
   my = 0;
   gx = 0;
   gy = 0;
   ctx = null;
-  sprites = new sprites_default(this.originalSpriteWidth, this.originalSpriteHeight);
+  sprites = null;
   running = false;
   lastTime = 0;
-  async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight) {
+  async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
+    this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
     const canvas = document.getElementById(canvasId);
     const ctx = canvas.getContext("2d");
@@ -1043,6 +1073,7 @@ var Main = class {
   }
   logic(delta) {
     this.player.update(this.game, delta);
+    this.fire.update(this.game, delta);
     this.monster.update(this.game, delta);
   }
   draw() {
@@ -1051,6 +1082,8 @@ var Main = class {
         this.drawTile(x, y);
       }
     }
+    if (this.map.isVisible(this.fire.x, this.fire.y))
+      this.drawEntity(this.fire);
     if (this.map.isVisible(this.monster.x, this.monster.y))
       this.drawEntity(this.monster);
     this.drawEntity(this.player);
@@ -1113,4 +1146,4 @@ var main_default = Main;
 
 // src/index.ts
 var main = new main_default();
-main.initialize("canvas", "images/sprites.bmp", 32, 32).then(() => main.start()).catch((err) => console.error(err));
+main.initialize("canvas", "images/sprites.bmp", 64, 32, 16, 16).then(() => main.start()).catch((err) => console.error(err));

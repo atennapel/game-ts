@@ -12,6 +12,7 @@ TODO:
 - [x] Move player animation in separate class
 - [x] Bumping animation
 - [x] NPCs
+- [ ] Improve entity management and tile management
 - [ ] Turn-based system
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 

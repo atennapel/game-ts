@@ -6,20 +6,29 @@ import Color from "./color";
 
 class AnimatedEntity implements Actor {
   private entity: Entity;
+
   absoluteX: number;
   absoluteY: number;
   private goalX: number;
   private goalY: number;
+
   private spriteWidth: number;
   private spriteHeight: number;
+
   private animating: boolean = false;
   private bumping: boolean = false;
+
   animationSpeed: number = 0.25;
   bumpRatio: number = 0.25;
-  sprite: number;
-  color: Color;
+  spriteCycleSpeed: number = 100;
 
-  constructor(entity: Entity, spriteWidth: number, spriteHeight: number, sprite: number, color: Color) {
+  private readonly sprites: number[];
+  private readonly colors: Color[];
+  private readonly cycles: number;
+  private spriteIndex: number = 0;
+  private spriteCycleAcc: number = 0;
+
+  constructor(entity: Entity, spriteWidth: number, spriteHeight: number, sprites: number[], colors: Color[]) {
     this.entity = entity;
     this.absoluteX = entity.x * spriteWidth;
     this.absoluteY = entity.y * spriteHeight;
@@ -27,12 +36,21 @@ class AnimatedEntity implements Actor {
     this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
-    this.sprite = sprite;
-    this.color = color;
+    this.sprites = sprites;
+    this.colors = colors;
+    this.cycles = Math.max(sprites.length, colors.length);
   }
 
   get x(): number { return this.entity.x }
   get y(): number { return this.entity.y }
+
+  get sprite(): number {
+    return this.sprites[this.spriteIndex % this.sprites.length];
+  }
+
+  get color(): Color {
+    return this.colors[this.spriteIndex % this.colors.length];
+  }
 
   isPlayer(): boolean {
     return this.entity.isPlayer();
@@ -58,9 +76,19 @@ class AnimatedEntity implements Actor {
   }
 
   update(game: Game, delta: number): void {
+    // animate sprite/color
+    this.spriteCycleAcc += delta;
+    if (this.spriteCycleAcc >= this.spriteCycleSpeed) {
+      this.spriteCycleAcc = 0;
+      this.spriteIndex++;
+      if (this.spriteIndex >= this.cycles)
+        this.spriteIndex = 0;
+    }
+
     // let entity take turn if possible
     if (!this.animating && !this.entity.takeTurn(game, this)) return;
 
+    // animate movement
     let gx = this.goalX;
     let gy = this.goalY;
     let ax = this.absoluteX;
