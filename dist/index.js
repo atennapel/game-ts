@@ -1,25 +1,4 @@
-// src/logic/actions/action.ts
-var Action = class {
-  perform(game, actor) {
-    let action = this;
-    while (action) action = action.tryPerform(game, actor);
-  }
-};
-var action_default = Action;
-
-// src/logic/actions/bumpaction.ts
-var BumpAction = class extends action_default {
-  position;
-  constructor(position) {
-    super();
-    this.position = position;
-  }
-  tryPerform(game, actor) {
-    actor.bump(this.position.x, this.position.y);
-    return null;
-  }
-};
-var bumpaction_default = BumpAction;
+"use strict";
 
 // src/logic/tile.ts
 var Tile = /* @__PURE__ */ ((Tile2) => {
@@ -43,8 +22,36 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
 })(Tile || (Tile = {}));
 var tile_default = Tile;
 
-// src/logic/actions/closedooraction.ts
-var CloseDoorAction = class extends action_default {
+// src/logic/actions/action.ts
+var Action = class {
+  perform(game, actor) {
+    let action = this;
+    while (true) {
+      const result = action.tryPerform(game, actor);
+      if (!result || result.length == 0) break;
+      action = result.shift();
+      actor.addActions(result);
+    }
+  }
+};
+var action_default = Action;
+
+// src/logic/actions/bumpaction.ts
+var BumpAction = class extends action_default {
+  position;
+  constructor(position) {
+    super();
+    this.position = position;
+  }
+  tryPerform(game, actor) {
+    actor.bump(this.position.x, this.position.y);
+    return null;
+  }
+};
+var bumpaction_default = BumpAction;
+
+// src/logic/actions/stepaction.ts
+var StepAction = class extends action_default {
   position;
   constructor(position) {
     super();
@@ -53,16 +60,29 @@ var CloseDoorAction = class extends action_default {
   tryPerform(game, actor) {
     const x = this.position.x;
     const y = this.position.y;
-    const map = game.world.map;
-    if (map.get(x, y) != tile_default.OpenDoor)
+    if (game.world.map.isBlocked(x, y))
       return null;
-    actor.bump(x, y);
-    map.set(x, y, tile_default.ClosedDoor);
-    game.refreshVisibility();
+    actor.move(x, y);
+    if (actor.isPlayer()) game.refreshVisibility();
     return null;
   }
 };
-var closedooraction_default = CloseDoorAction;
+var stepaction_default = StepAction;
+
+// src/logic/actions/moveaction.ts
+var MoveAction = class extends action_default {
+  position;
+  constructor(position) {
+    super();
+    this.position = position;
+  }
+  tryPerform(game, actor) {
+    const path = game.findPath(actor.x, actor.y, this.position.x, this.position.y);
+    if (path) return path.map((p) => new stepaction_default(p));
+    return null;
+  }
+};
+var moveaction_default = MoveAction;
 
 // src/logic/actions/opendooraction.ts
 var OpenDoorAction = class extends action_default {
@@ -85,8 +105,49 @@ var OpenDoorAction = class extends action_default {
 };
 var opendooraction_default = OpenDoorAction;
 
-// src/logic/actions/moveaction.ts
-var MoveAction = class extends action_default {
+// src/logic/actions/primaryaction.ts
+var PrimaryAction = class extends action_default {
+  position;
+  constructor(position) {
+    super();
+    this.position = position;
+  }
+  tryPerform(game, actor) {
+    const gx = this.position.x;
+    const gy = this.position.y;
+    const map = game.world.map;
+    const tile = map.get(gx, gy);
+    if (tile == tile_default.ClosedDoor) {
+      map.set(gx, gy, tile_default.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new opendooraction_default(last));
+        actions.push(new stepaction_default(last));
+        return actions;
+      }
+      return null;
+    } else if (tile_default.isBlocked(tile)) {
+      map.set(gx, gy, tile_default.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new bumpaction_default(last));
+        return actions;
+      }
+      return null;
+    }
+    return [new moveaction_default(this.position)];
+  }
+};
+var primaryaction_default = PrimaryAction;
+
+// src/logic/actions/closedooraction.ts
+var CloseDoorAction = class extends action_default {
   position;
   constructor(position) {
     super();
@@ -96,16 +157,51 @@ var MoveAction = class extends action_default {
     const x = this.position.x;
     const y = this.position.y;
     const map = game.world.map;
-    if (map.get(x, y) == tile_default.ClosedDoor)
-      return new opendooraction_default(this.position);
-    if (map.isBlocked(x, y))
-      return new bumpaction_default(this.position);
-    actor.move(x, y);
-    if (actor.isPlayer) game.refreshVisibility();
+    if (map.get(x, y) != tile_default.OpenDoor)
+      return null;
+    actor.bump(x, y);
+    map.set(x, y, tile_default.ClosedDoor);
+    game.refreshVisibility();
     return null;
   }
 };
-var moveaction_default = MoveAction;
+var closedooraction_default = CloseDoorAction;
+
+// src/logic/actions/secondaryaction.ts
+var SecondaryAction = class extends action_default {
+  position;
+  constructor(position) {
+    super();
+    this.position = position;
+  }
+  tryPerform(game, actor) {
+    const gx = this.position.x;
+    const gy = this.position.y;
+    const map = game.world.map;
+    const tile = map.get(gx, gy);
+    if (tile == tile_default.ClosedDoor) {
+      map.set(gx, gy, tile_default.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new opendooraction_default(last));
+        return actions;
+      }
+    } else if (tile == tile_default.OpenDoor) {
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new closedooraction_default(last));
+        return actions;
+      }
+    }
+    return null;
+  }
+};
+var secondaryaction_default = SecondaryAction;
 
 // src/logic/pos.ts
 var Pos = class {
@@ -505,16 +601,63 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
-// src/logic/entity.ts
+// src/logic/entities/entity.ts
 var Entity = class {
   x;
   y;
+  actionStack = [];
   constructor(x, y) {
     this.x = x;
     this.y = y;
   }
+  resetActions() {
+    this.actionStack = [];
+  }
+  isIdle() {
+    return this.actionStack.length == 0;
+  }
+  addActions(actions) {
+    for (let i = actions.length - 1; i >= 0; i--)
+      this.actionStack.push(actions[i]);
+  }
+  setAction(action) {
+    this.actionStack = [action];
+  }
+  takeTurn(game, actor) {
+    this.decideNextAction(game);
+    const action = this.actionStack.pop() || null;
+    if (action) {
+      action.perform(game, actor);
+      return true;
+    } else return false;
+  }
 };
 var entity_default = Entity;
+
+// src/logic/entities/npc.ts
+var NPC = class extends entity_default {
+  isPlayer() {
+    return false;
+  }
+  decideNextAction(game) {
+    if (!this.isIdle()) return;
+    const map = game.world.map;
+    const gx = Math.floor(Math.random() * map.width);
+    const gy = Math.floor(Math.random() * map.height);
+    this.setAction(new primaryaction_default(new pos_default(gx, gy)));
+  }
+};
+var npc_default = NPC;
+
+// src/logic/entities/player.ts
+var Player = class extends entity_default {
+  isPlayer() {
+    return true;
+  }
+  decideNextAction(game) {
+  }
+};
+var player_default = Player;
 
 // src/util.ts
 function array2d(width, height, value) {
@@ -584,8 +727,8 @@ var World = class {
   npc;
   constructor(width, height) {
     this.map = new map_default(width, height);
-    this.player = new entity_default(1, 1);
-    this.npc = new entity_default(2, 2);
+    this.player = new player_default(1, 1);
+    this.npc = new npc_default(2, 2);
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
@@ -635,8 +778,9 @@ var AnimatedEntity = class {
   bumping = false;
   animationSpeed = 0.25;
   bumpRatio = 0.25;
-  isPlayer;
-  constructor(entity, spriteWidth, spriteHeight, isPlayer = false) {
+  sprite;
+  color;
+  constructor(entity, spriteWidth, spriteHeight, sprite, color) {
     this.entity = entity;
     this.absoluteX = entity.x * spriteWidth;
     this.absoluteY = entity.y * spriteHeight;
@@ -644,13 +788,17 @@ var AnimatedEntity = class {
     this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
-    this.isPlayer = isPlayer;
+    this.sprite = sprite;
+    this.color = color;
   }
   get x() {
     return this.entity.x;
   }
   get y() {
     return this.entity.y;
+  }
+  isPlayer() {
+    return this.entity.isPlayer();
   }
   isAnimating() {
     return this.animating;
@@ -668,8 +816,8 @@ var AnimatedEntity = class {
     this.goalX = this.absoluteX + dx * this.spriteWidth * this.bumpRatio;
     this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
   }
-  update(delta) {
-    if (!this.animating) return;
+  update(game, delta) {
+    if (!this.animating && !this.entity.takeTurn(game, this)) return;
     let gx = this.goalX;
     let gy = this.goalY;
     let ax = this.absoluteX;
@@ -706,6 +854,18 @@ var AnimatedEntity = class {
     this.absoluteX = ax;
     this.absoluteY = ay;
     return;
+  }
+  resetActions() {
+    this.entity.resetActions();
+  }
+  addActions(actions) {
+    this.entity.addActions(actions);
+  }
+  setAction(action) {
+    this.entity.setAction(action);
+  }
+  isIdle() {
+    return this.entity.isIdle();
   }
 };
 var animatedentity_default = AnimatedEntity;
@@ -809,8 +969,6 @@ var sprites_default = Sprites;
 
 // src/graphics/main.ts
 var Main = class {
-  running = false;
-  lastTime;
   width = 20;
   height = 20;
   originalSpriteWidth = 16;
@@ -820,16 +978,16 @@ var Main = class {
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
-  player = new animatedentity_default(this.world.player, this.spriteWidth, this.spriteHeight, true);
-  gx = 0;
-  gy = 0;
-  actionStack = null;
-  monster = new animatedentity_default(this.world.npc, this.spriteWidth, this.spriteHeight);
-  monsterActionStack = null;
+  player = new animatedentity_default(this.world.player, this.spriteWidth, this.spriteHeight, 0, color_default.Black);
+  monster = new animatedentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, 0, color_default.Red);
   mx = 0;
   my = 0;
-  ctx;
+  gx = 0;
+  gy = 0;
+  ctx = null;
   sprites = new sprites_default(this.originalSpriteWidth, this.originalSpriteHeight);
+  running = false;
+  lastTime = 0;
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight) {
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
     const canvas = document.getElementById(canvasId);
@@ -861,71 +1019,13 @@ var Main = class {
     const my = this.my;
     if (!this.map.isExplored(mx, my)) return;
     if (event.buttons == 4 || event.ctrlKey && event.buttons == 1) {
-      const tile = this.map.get(mx, my);
-      if (tile == tile_default.OpenDoor) {
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop();
-          const actions = path.map((p) => new moveaction_default(p));
-          actions.push(new closedooraction_default(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else if (tile == tile_default.ClosedDoor) {
-        this.map.set(mx, my, tile_default.OpenDoor);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, tile_default.ClosedDoor);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop();
-          const actions = path.map((p) => new moveaction_default(p));
-          actions.push(new opendooraction_default(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      }
+      this.gx = mx;
+      this.gy = my;
+      this.player.setAction(new secondaryaction_default(new pos_default(mx, my)));
     } else if (event.buttons == 1) {
-      const tile = this.map.get(mx, my);
-      if (tile == tile_default.ClosedDoor) {
-        this.map.set(mx, my, tile_default.OpenDoor);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, tile_default.ClosedDoor);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop();
-          const actions = path.map((p) => new moveaction_default(p));
-          actions.push(new opendooraction_default(last));
-          actions.push(new moveaction_default(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else if (tile == tile_default.Wall) {
-        this.map.set(mx, my, tile_default.Empty);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, tile_default.Wall);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop();
-          const actions = path.map((p) => new moveaction_default(p));
-          actions.push(new bumpaction_default(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else {
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        if (path) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const actions = path.map((p) => new moveaction_default(p));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      }
+      this.gx = mx;
+      this.gy = my;
+      this.player.setAction(new primaryaction_default(new pos_default(mx, my)));
     }
   }
   initLoop() {
@@ -941,70 +1041,8 @@ var Main = class {
     requestAnimationFrame((time2) => this.loop(time2));
   }
   logic(delta) {
-    if (!this.player.isAnimating()) {
-      const actionStack = this.actionStack;
-      if (actionStack) {
-        if (actionStack.length > 0) {
-          const nextAction = actionStack.pop();
-          nextAction.perform(this.game, this.player);
-        } else this.actionStack = null;
-      }
-    }
-    if (!this.monster.isAnimating()) {
-      const actionStack = this.monsterActionStack;
-      if (actionStack) {
-        if (actionStack.length > 0) {
-          const nextAction = actionStack.pop();
-          nextAction.perform(this.game, this.monster);
-        } else this.monsterActionStack = null;
-      } else {
-        const x = Math.floor(Math.random() * this.width);
-        const y = Math.floor(Math.random() * this.height);
-        const tile = this.map.get(x, y);
-        if (tile == tile_default.Empty) {
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          if (path) {
-            const actions = path.map((p) => new moveaction_default(p));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == tile_default.Wall) {
-          this.map.set(x, y, tile_default.Empty);
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          this.map.set(x, y, tile_default.Wall);
-          if (path && path.length > 0) {
-            const last = path.pop();
-            const actions = path.map((p) => new moveaction_default(p));
-            actions.push(new bumpaction_default(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == tile_default.ClosedDoor) {
-          this.map.set(x, y, tile_default.Empty);
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          this.map.set(x, y, tile_default.Wall);
-          if (path && path.length > 0) {
-            const last = path.pop();
-            const actions = path.map((p) => new moveaction_default(p));
-            actions.push(new opendooraction_default(last));
-            actions.push(new moveaction_default(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == tile_default.OpenDoor) {
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          if (path && path.length > 0) {
-            const last = path.pop();
-            const actions = path.map((p) => new moveaction_default(p));
-            actions.push(new closedooraction_default(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        }
-      }
-    }
-    this.monster.update(delta);
-    this.player.update(delta);
+    this.player.update(this.game, delta);
+    this.monster.update(this.game, delta);
   }
   draw() {
     for (let x = 0; x < this.width; x++) {
@@ -1013,9 +1051,9 @@ var Main = class {
       }
     }
     if (this.map.isVisible(this.monster.x, this.monster.y))
-      this.drawSpriteAbsolute(0, this.monster.absoluteX, this.monster.absoluteY, color_default.Red, color_default.Transparent);
-    this.drawSpriteAbsolute(0, this.player.absoluteX, this.player.absoluteY, color_default.Black, color_default.Transparent);
-    if (this.actionStack)
+      this.drawEntity(this.monster);
+    this.drawEntity(this.player);
+    if (!this.player.isIdle())
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
     this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
     const tileText = tile_default.description(this.map.get(this.mx, this.my));
@@ -1065,6 +1103,9 @@ var Main = class {
   }
   drawSprite(index, x, y, foreground) {
     this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground);
+  }
+  drawEntity(entity) {
+    this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, color_default.Transparent);
   }
 };
 var main_default = Main;

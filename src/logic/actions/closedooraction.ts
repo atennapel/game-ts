@@ -12,7 +12,7 @@ class CloseDoorAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action | null {
+  override tryPerform(game: Game, actor: Actor): Action[] | null {
     const x = this.position.x;
     const y = this.position.y;
     const map = game.world.map;

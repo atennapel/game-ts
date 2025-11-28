@@ -3,7 +3,7 @@ import Game from "../game";
 import Pos from "../pos";
 import Action from "./action";
 
-class BumpAction extends Action {
+class StepAction extends Action {
   readonly position: Pos;
 
   constructor(position: Pos) {
@@ -12,9 +12,16 @@ class BumpAction extends Action {
   }
 
   override tryPerform(game: Game, actor: Actor): Action[] | null {
-    actor.bump(this.position.x, this.position.y);
+    const x = this.position.x;
+    const y = this.position.y;
+
+    if (game.world.map.isBlocked(x, y))
+      return null;
+
+    actor.move(x, y);
+    if (actor.isPlayer()) game.refreshVisibility();
     return null;
   }
 }
 
-export default BumpAction;
+export default StepAction;

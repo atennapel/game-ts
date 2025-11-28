@@ -1,5 +1,8 @@
+import Action from "../logic/actions/action";
 import Actor from "../logic/actor";
-import Entity from "../logic/entity";
+import Entity from "../logic/entities/entity";
+import Game from "../logic/game";
+import Color from "./color";
 
 class AnimatedEntity implements Actor {
   private entity: Entity;
@@ -13,10 +16,10 @@ class AnimatedEntity implements Actor {
   private bumping: boolean = false;
   animationSpeed: number = 0.25;
   bumpRatio: number = 0.25;
+  sprite: number;
+  color: Color;
 
-  readonly isPlayer: boolean;
-
-  constructor(entity: Entity, spriteWidth: number, spriteHeight: number, isPlayer: boolean = false) {
+  constructor(entity: Entity, spriteWidth: number, spriteHeight: number, sprite: number, color: Color) {
     this.entity = entity;
     this.absoluteX = entity.x * spriteWidth;
     this.absoluteY = entity.y * spriteHeight;
@@ -24,11 +27,16 @@ class AnimatedEntity implements Actor {
     this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
-    this.isPlayer = isPlayer;
+    this.sprite = sprite;
+    this.color = color;
   }
 
   get x(): number { return this.entity.x }
   get y(): number { return this.entity.y }
+
+  isPlayer(): boolean {
+    return this.entity.isPlayer();
+  }
 
   isAnimating(): boolean {
     return this.animating;
@@ -49,8 +57,9 @@ class AnimatedEntity implements Actor {
     this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
   }
 
-  update(delta: number): void {
-    if (!this.animating) return;
+  update(game: Game, delta: number): void {
+    // let entity take turn if possible
+    if (!this.animating && !this.entity.takeTurn(game, this)) return;
 
     let gx = this.goalX;
     let gy = this.goalY;
@@ -92,6 +101,22 @@ class AnimatedEntity implements Actor {
     this.absoluteY = ay;
 
     return;
+  }
+
+  resetActions(): void {
+    this.entity.resetActions();
+  }
+
+  addActions(actions: Action[]): void {
+    this.entity.addActions(actions);
+  }
+
+  setAction(action: Action): void {
+    this.entity.setAction(action);
+  }
+
+  isIdle(): boolean {
+    return this.entity.isIdle();
   }
 }
 

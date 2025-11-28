@@ -1,12 +1,8 @@
-import Action from "../logic/actions/action";
-import BumpAction from "../logic/actions/bumpaction";
-import CloseDoorAction from "../logic/actions/closedooraction";
-import MoveAction from "../logic/actions/moveaction";
-import OpenDoorAction from "../logic/actions/opendooraction";
+import PrimaryAction from "../logic/actions/primaryaction";
+import SecondaryAction from "../logic/actions/secondaryaction";
 import Game from "../logic/game";
 import Map from "../logic/map";
-import PathFinding from "../logic/pathfinding";
-import ShadowCasting from "../logic/shadowcasting";
+import Pos from "../logic/pos";
 import Tile from "../logic/tile";
 import World from "../logic/world";
 import AnimatedEntity from "./animatedentity";
@@ -14,9 +10,6 @@ import Color from "./color";
 import Sprites from "./sprites";
 
 class Main {
-  private running: boolean = false;
-  private lastTime: DOMHighResTimeStamp;
-
   private readonly width: number = 20;
   private readonly height: number = 20;
   private readonly originalSpriteWidth: number = 16;
@@ -28,19 +21,19 @@ class Main {
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
-  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, true);
-  private gx: number = 0;
-  private gy: number = 0;
-  private actionStack: Action[] | null = null;
-
-  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight);
-  private monsterActionStack: Action[] | null = null;
+  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, 0, Color.Black);
+  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight, 0, Color.Red);
 
   private mx: number = 0;
   private my: number = 0;
+  private gx: number = 0;
+  private gy: number = 0;
 
-  private ctx: CanvasRenderingContext2D;
+  private ctx: CanvasRenderingContext2D | null = null;
   private readonly sprites: Sprites = new Sprites(this.originalSpriteWidth, this.originalSpriteHeight);
+
+  private running: boolean = false;
+  private lastTime: DOMHighResTimeStamp = 0;
 
   async initialize(canvasId: string, spriteSheetUrl: string, spriteSheetWidth: number, spriteSheetHeight: number): Promise<void> {
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -79,73 +72,13 @@ class Main {
     const my = this.my;
     if (!this.map.isExplored(mx, my)) return;
     if (event.buttons == 4 || (event.ctrlKey && event.buttons == 1)) {
-      // alternative action
-      const tile = this.map.get(mx, my);
-      if (tile == Tile.OpenDoor) {
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop()!;
-          const actions = path.map(p => new MoveAction(p));
-          actions.push(new CloseDoorAction(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else if (tile == Tile.ClosedDoor) {
-        this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, Tile.ClosedDoor);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop()!;
-          const actions = path.map(p => new MoveAction(p));
-          actions.push(new OpenDoorAction(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      }
+      this.gx = mx;
+      this.gy = my;
+      this.player.setAction(new SecondaryAction(new Pos(mx, my)));
     } else if (event.buttons == 1) {
-      // main action
-      const tile = this.map.get(mx, my);
-      if (tile == Tile.ClosedDoor) {
-        this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, Tile.ClosedDoor);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop()!;
-          const actions = path.map(p => new MoveAction(p));
-          actions.push(new OpenDoorAction(last));
-          actions.push(new MoveAction(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else if (tile == Tile.Wall) {
-        this.map.set(mx, my, Tile.Empty);
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        this.map.set(mx, my, Tile.Wall);
-        if (path && path.length > 0) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const last = path.pop()!;
-          const actions = path.map(p => new MoveAction(p));
-          actions.push(new BumpAction(last));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      } else {
-        const path = this.game.findPath(this.player.x, this.player.y, mx, my);
-        if (path) {
-          this.gx = this.mx;
-          this.gy = this.my;
-          const actions = path.map(p => new MoveAction(p));
-          actions.reverse();
-          this.actionStack = actions;
-        }
-      }
+      this.gx = mx;
+      this.gy = my;
+      this.player.setAction(new PrimaryAction(new Pos(mx, my)));
     }
   }
 
@@ -167,75 +100,8 @@ class Main {
   }
 
   private logic(delta: number): void {
-    // perform player actions
-    if (!this.player.isAnimating()) {
-      const actionStack = this.actionStack;
-      if (actionStack) {
-        if (actionStack.length > 0) {
-          const nextAction = actionStack.pop()!;
-          nextAction.perform(this.game, this.player);
-        } else this.actionStack = null;
-      }
-    }
-
-    // perform and plan monster actions
-    if (!this.monster.isAnimating()) {
-      const actionStack = this.monsterActionStack;
-      if (actionStack) {
-        if (actionStack.length > 0) {
-          const nextAction = actionStack.pop()!;
-          nextAction.perform(this.game, this.monster);
-        } else this.monsterActionStack = null;
-      } else {
-        const x = Math.floor(Math.random() * this.width);
-        const y = Math.floor(Math.random() * this.height);
-        const tile = this.map.get(x, y);
-        if (tile == Tile.Empty) {
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          if (path) {
-            const actions = path.map(p => new MoveAction(p));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == Tile.Wall) {
-          this.map.set(x, y, Tile.Empty);
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          this.map.set(x, y, Tile.Wall);
-          if (path && path.length > 0) {
-            const last = path.pop()!;
-            const actions = path.map(p => new MoveAction(p));
-            actions.push(new BumpAction(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == Tile.ClosedDoor) {
-          this.map.set(x, y, Tile.Empty);
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          this.map.set(x, y, Tile.Wall);
-          if (path && path.length > 0) {
-            const last = path.pop()!;
-            const actions = path.map(p => new MoveAction(p));
-            actions.push(new OpenDoorAction(last));
-            actions.push(new MoveAction(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        } else if (tile == Tile.OpenDoor) {
-          const path = this.game.findPath(this.monster.x, this.monster.y, x, y);
-          if (path && path.length > 0) {
-            const last = path.pop()!;
-            const actions = path.map(p => new MoveAction(p));
-            actions.push(new CloseDoorAction(last));
-            actions.reverse();
-            this.monsterActionStack = actions;
-          }
-        }
-      }
-    }
-
-    // update animations
-    this.monster.update(delta);
-    this.player.update(delta);
+    this.player.update(this.game, delta);
+    this.monster.update(this.game, delta);
   }
 
   private draw(): void {
@@ -246,15 +112,13 @@ class Main {
       }
     }
 
-    // draw monster
+    // draw entities
     if (this.map.isVisible(this.monster.x, this.monster.y))
-      this.drawSpriteAbsolute(0, this.monster.absoluteX, this.monster.absoluteY, Color.Red, Color.Transparent);
-
-    // draw player
-    this.drawSpriteAbsolute(0, this.player.absoluteX, this.player.absoluteY, Color.Black, Color.Transparent);
+      this.drawEntity(this.monster);
+    this.drawEntity(this.player);
 
     // draw goal
-    if (this.actionStack)
+    if (!this.player.isIdle())
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
 
     // draw mouse indicator
@@ -263,11 +127,11 @@ class Main {
     // draw description text
     const tileText = Tile.description(this.map.get(this.mx, this.my));
     if (tileText) {
-      this.ctx.font = "12px monospace";
-      this.ctx.fillStyle = "white";
-      this.ctx.fillRect(0, 0, tileText.length * 8, 16);
-      this.ctx.fillStyle = "black";
-      this.ctx.fillText(tileText, 5, 10);
+      this.ctx!.font = "12px monospace";
+      this.ctx!.fillStyle = "white";
+      this.ctx!.fillRect(0, 0, tileText.length * 8, 16);
+      this.ctx!.fillStyle = "black";
+      this.ctx!.fillText(tileText, 5, 10);
     }
   }
 
@@ -300,18 +164,22 @@ class Main {
     }
   }
 
-  private drawRect(x: number, y: number, style: string) {
-    this.ctx.fillStyle = style;
-    this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
+  private drawRect(x: number, y: number, style: string): void {
+    this.ctx!.fillStyle = style;
+    this.ctx!.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
   }
 
-  private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color, background: Color = Color.White) {
+  private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color, background: Color = Color.White): void {
     const image = this.sprites.get(index, background, foreground);
-    if (image) this.ctx.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
+    if (image) this.ctx!.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
 
-  private drawSprite(index: number, x: number, y: number, foreground: Color) {
+  private drawSprite(index: number, x: number, y: number, foreground: Color): void {
     this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground);
+  }
+
+  private drawEntity(entity: AnimatedEntity): void {
+    this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, Color.Transparent);
   }
 }
 
