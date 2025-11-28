@@ -3,6 +3,7 @@ import PathFinding from "../logic/pathfinding";
 import Pos from "../logic/pos";
 import ShadowCasting from "../logic/shadowcasting";
 import Tile from "../logic/tile";
+import AnimatedEntity from "./animatedentity";
 import Color from "./color";
 import Sprites from "./sprites";
 
@@ -47,12 +48,7 @@ class Main {
   private readonly pathfinding: PathFinding = new PathFinding(this.map);
   private readonly shadowcasting: ShadowCasting = new ShadowCasting(this.map);
 
-  private x: number = 1;
-  private y: number = 1;
-  private ax: number = this.spriteWidth;
-  private ay: number = this.spriteHeight;
-  private ox: number = 0;
-  private oy: number = 0;
+  private player: AnimatedEntity = new AnimatedEntity(1, 1, this.spriteWidth, this.spriteHeight);
   private gx: number = 0;
   private gy: number = 0;
   private actionStack: Action[] | null = null;
@@ -91,11 +87,15 @@ class Main {
     canvas.addEventListener("mousedown", event => this.handleMouseDown(event));
   }
 
+  refreshVisibility() {
+    this.shadowcasting.refreshVisibility(this.player.x, this.player.y);
+  }
+
   start(): void {
     this.running = true;
     requestAnimationFrame(time => {
       this.lastTime = time;
-      this.shadowcasting.refreshVisibility(this.x, this.y);
+      this.initLoop();
       requestAnimationFrame(time => this.loop(time));
     });
   }
@@ -118,7 +118,7 @@ class Main {
       // alternative action
       const tile = this.map.get(mx, my);
       if (tile == Tile.OpenDoor) {
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
@@ -130,7 +130,7 @@ class Main {
         }
       } else if (tile == Tile.ClosedDoor) {
         this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, Tile.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
@@ -147,7 +147,7 @@ class Main {
       const tile = this.map.get(mx, my);
       if (tile == Tile.ClosedDoor) {
         this.map.set(mx, my, Tile.OpenDoor);
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, Tile.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
@@ -160,7 +160,7 @@ class Main {
           this.actionStack = actions;
         }
       } else {
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         if (path) {
           this.gx = this.mx;
           this.gy = this.my;
@@ -170,6 +170,11 @@ class Main {
         }
       }
     }
+  }
+
+  private initLoop(): void {
+    this.refreshVisibility();
+    this.draw();
   }
 
   private loop(time: DOMHighResTimeStamp): void {
@@ -185,24 +190,16 @@ class Main {
   }
 
   private logic(delta: number): void {
-    let x = this.x;
-    let y = this.y;
-    let ox = this.ox;
-    let oy = this.oy;
-
     let shouldRefreshVisiblity = false;
 
     const actionStack = this.actionStack;
     if (actionStack) {
       if (actionStack.length > 0) {
-        if (ox == 0 && oy == 0) {
+        if (!this.player.isAnimating()) {
           const nextAction = actionStack.pop()!;
           if (nextAction instanceof Move) {
             const pos = nextAction.position;
-            if (pos.x > x) ox = this.spriteWidth;
-            else if (pos.x < x) ox = -this.spriteWidth;
-            if (pos.y > y) oy = this.spriteHeight;
-            else if (pos.y < y) oy = -this.spriteHeight;
+            this.player.offsetTowards(pos.x, pos.y);
           } else if (nextAction instanceof OpenDoor) {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, Tile.OpenDoor);
@@ -216,56 +213,11 @@ class Main {
       } else this.actionStack = null;
     }
 
-    if (ox > 0) {
-      const dist = delta * this.animationSpeed;
-      this.ax += dist;
-      ox -= dist;
-      if (ox < 0.1) {
-        ox = 0;
-        x += 1;
-        this.ax = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (ox < 0) {
-      const dist = delta * this.animationSpeed;
-      this.ax -= dist;
-      ox += dist;
-      if (ox > -0.1) {
-        ox = 0;
-        x -= 1;
-        this.ax = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    }
-    if (oy > 0) {
-      const dist = delta * this.animationSpeed;
-      this.ay += dist;
-      oy -= dist;
-      if (oy < 0.1) {
-        oy = 0;
-        y += 1;
-        this.ay = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (oy < 0) {
-      const dist = delta * this.animationSpeed;
-      this.ay -= dist;
-      oy += dist;
-      if (oy > -0.1) {
-        oy = 0;
-        y -= 1;
-        this.ay = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    }
+    // update player animation
+    shouldRefreshVisiblity = shouldRefreshVisiblity || this.player.update(delta);
 
     if (shouldRefreshVisiblity)
-      this.shadowcasting.refreshVisibility(x, y);
-
-    this.x = x;
-    this.y = y;
-    this.ox = ox;
-    this.oy = oy;
+      this.refreshVisibility();
   }
 
   private draw(): void {
@@ -277,7 +229,7 @@ class Main {
     }
 
     // draw player
-    this.drawSpriteAbsolute(0, this.ax, this.ay, Color.Black, Color.Transparent);
+    this.drawSpriteAbsolute(0, this.player.absoluteX, this.player.absoluteY, Color.Black, Color.Transparent);
 
     // draw goal
     if (this.actionStack)

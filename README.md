@@ -9,9 +9,9 @@ TODO:
 - [x] Sprites with re-coloring
 - [x] Basic animation
 - [x] Add doors for interaction
-- [ ] Move player and animation data in separate classes
-- [ ] Turn-based system
+- [x] Move player animation in separate class
 - [ ] NPCs
+- [ ] Turn-based system
 
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm

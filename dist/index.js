@@ -479,6 +479,96 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
+// src/graphics/animatedentity.ts
+var AnimatedEntity = class {
+  x;
+  y;
+  absoluteX;
+  absoluteY;
+  offsetX = 0;
+  offsetY = 0;
+  spriteWidth;
+  spriteHeight;
+  animationSpeed = 0.25;
+  constructor(x, y, spriteWidth, spriteHeight) {
+    this.x = x;
+    this.y = y;
+    this.absoluteX = x * spriteWidth;
+    this.absoluteY = y * spriteHeight;
+    this.spriteWidth = spriteWidth;
+    this.spriteHeight = spriteHeight;
+  }
+  isAnimating() {
+    return this.offsetX != 0 || this.offsetY != 0;
+  }
+  offset(dx, dy) {
+    this.offsetX = dx * this.spriteWidth;
+    this.offsetY = dy * this.spriteHeight;
+  }
+  offsetTowards(x, y) {
+    if (x > this.x) this.offsetX = this.spriteWidth;
+    else if (x < this.x) this.offsetX = -this.spriteWidth;
+    if (y > this.y) this.offsetY = this.spriteHeight;
+    else if (y < this.y) this.offsetY = -this.spriteHeight;
+  }
+  // TODO: bumping
+  update(delta) {
+    let x = this.x;
+    let y = this.y;
+    let ox = this.offsetX;
+    let oy = this.offsetY;
+    let shouldRefreshVisiblity = false;
+    if (ox > 0) {
+      const dist = delta * this.animationSpeed;
+      this.absoluteX += dist;
+      ox -= dist;
+      if (ox < 0.1) {
+        ox = 0;
+        x += 1;
+        this.absoluteX = x * this.spriteWidth;
+        shouldRefreshVisiblity = true;
+      }
+    } else if (ox < 0) {
+      const dist = delta * this.animationSpeed;
+      this.absoluteX -= dist;
+      ox += dist;
+      if (ox > -0.1) {
+        ox = 0;
+        x -= 1;
+        this.absoluteX = x * this.spriteWidth;
+        shouldRefreshVisiblity = true;
+      }
+    }
+    if (oy > 0) {
+      const dist = delta * this.animationSpeed;
+      this.absoluteY += dist;
+      oy -= dist;
+      if (oy < 0.1) {
+        oy = 0;
+        y += 1;
+        this.absoluteY = y * this.spriteHeight;
+        shouldRefreshVisiblity = true;
+      }
+    } else if (oy < 0) {
+      const dist = delta * this.animationSpeed;
+      this.absoluteY -= dist;
+      oy += dist;
+      if (oy > -0.1) {
+        oy = 0;
+        y -= 1;
+        this.absoluteY = y * this.spriteHeight;
+        shouldRefreshVisiblity = true;
+      }
+    }
+    this.x = x;
+    this.y = y;
+    this.offsetX = ox;
+    this.offsetY = oy;
+    return shouldRefreshVisiblity;
+  }
+};
+var animatedentity_default = AnimatedEntity;
+
 // src/graphics/color.ts
 var Color = class _Color {
   r;
@@ -607,12 +697,7 @@ var Main = class {
   map = new map_default(this.width, this.height);
   pathfinding = new pathfinding_default(this.map);
   shadowcasting = new shadowcasting_default(this.map);
-  x = 1;
-  y = 1;
-  ax = this.spriteWidth;
-  ay = this.spriteHeight;
-  ox = 0;
-  oy = 0;
+  player = new animatedentity_default(1, 1, this.spriteWidth, this.spriteHeight);
   gx = 0;
   gy = 0;
   actionStack = null;
@@ -644,11 +729,14 @@ var Main = class {
     canvas.addEventListener("mousemove", (event) => this.handleMouseMove(event));
     canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event));
   }
+  refreshVisibility() {
+    this.shadowcasting.refreshVisibility(this.player.x, this.player.y);
+  }
   start() {
     this.running = true;
     requestAnimationFrame((time) => {
       this.lastTime = time;
-      this.shadowcasting.refreshVisibility(this.x, this.y);
+      this.initLoop();
       requestAnimationFrame((time2) => this.loop(time2));
     });
   }
@@ -667,7 +755,7 @@ var Main = class {
     if (event.buttons == 4 || event.ctrlKey && event.buttons == 1) {
       const tile = this.map.get(mx, my);
       if (tile == tile_default.OpenDoor) {
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         if (path && path.length > 0) {
           this.gx = this.mx;
           this.gy = this.my;
@@ -679,7 +767,7 @@ var Main = class {
         }
       } else if (tile == tile_default.ClosedDoor) {
         this.map.set(mx, my, tile_default.OpenDoor);
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, tile_default.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
@@ -695,7 +783,7 @@ var Main = class {
       const tile = this.map.get(mx, my);
       if (tile == tile_default.ClosedDoor) {
         this.map.set(mx, my, tile_default.OpenDoor);
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         this.map.set(mx, my, tile_default.ClosedDoor);
         if (path && path.length > 0) {
           this.gx = this.mx;
@@ -708,7 +796,7 @@ var Main = class {
           this.actionStack = actions;
         }
       } else {
-        const path = this.pathfinding.findPath(this.x, this.y, mx, my);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
         if (path) {
           this.gx = this.mx;
           this.gy = this.my;
@@ -719,6 +807,10 @@ var Main = class {
       }
     }
   }
+  initLoop() {
+    this.refreshVisibility();
+    this.draw();
+  }
   loop(time) {
     if (!this.running) return;
     const delta = time - this.lastTime;
@@ -728,22 +820,15 @@ var Main = class {
     requestAnimationFrame((time2) => this.loop(time2));
   }
   logic(delta) {
-    let x = this.x;
-    let y = this.y;
-    let ox = this.ox;
-    let oy = this.oy;
     let shouldRefreshVisiblity = false;
     const actionStack = this.actionStack;
     if (actionStack) {
       if (actionStack.length > 0) {
-        if (ox == 0 && oy == 0) {
+        if (!this.player.isAnimating()) {
           const nextAction = actionStack.pop();
           if (nextAction instanceof Move) {
             const pos = nextAction.position;
-            if (pos.x > x) ox = this.spriteWidth;
-            else if (pos.x < x) ox = -this.spriteWidth;
-            if (pos.y > y) oy = this.spriteHeight;
-            else if (pos.y < y) oy = -this.spriteHeight;
+            this.player.offsetTowards(pos.x, pos.y);
           } else if (nextAction instanceof OpenDoor) {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, tile_default.OpenDoor);
@@ -756,54 +841,9 @@ var Main = class {
         }
       } else this.actionStack = null;
     }
-    if (ox > 0) {
-      const dist = delta * this.animationSpeed;
-      this.ax += dist;
-      ox -= dist;
-      if (ox < 0.1) {
-        ox = 0;
-        x += 1;
-        this.ax = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (ox < 0) {
-      const dist = delta * this.animationSpeed;
-      this.ax -= dist;
-      ox += dist;
-      if (ox > -0.1) {
-        ox = 0;
-        x -= 1;
-        this.ax = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    }
-    if (oy > 0) {
-      const dist = delta * this.animationSpeed;
-      this.ay += dist;
-      oy -= dist;
-      if (oy < 0.1) {
-        oy = 0;
-        y += 1;
-        this.ay = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (oy < 0) {
-      const dist = delta * this.animationSpeed;
-      this.ay -= dist;
-      oy += dist;
-      if (oy > -0.1) {
-        oy = 0;
-        y -= 1;
-        this.ay = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    }
+    shouldRefreshVisiblity = shouldRefreshVisiblity || this.player.update(delta);
     if (shouldRefreshVisiblity)
-      this.shadowcasting.refreshVisibility(x, y);
-    this.x = x;
-    this.y = y;
-    this.ox = ox;
-    this.oy = oy;
+      this.refreshVisibility();
   }
   draw() {
     for (let x = 0; x < this.width; x++) {
@@ -811,7 +851,7 @@ var Main = class {
         this.drawTile(x, y);
       }
     }
-    this.drawSpriteAbsolute(0, this.ax, this.ay, color_default.Black, color_default.Transparent);
+    this.drawSpriteAbsolute(0, this.player.absoluteX, this.player.absoluteY, color_default.Black, color_default.Transparent);
     if (this.actionStack)
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
     this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
