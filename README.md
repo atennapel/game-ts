@@ -10,8 +10,10 @@ TODO:
 - [x] Basic animation
 - [x] Add doors for interaction
 - [x] Move player animation in separate class
+- [x] Bumping animation
 - [ ] NPCs
 - [ ] Turn-based system
+- [ ] Fix issue with diagonals in the pathfinding algorithm
 
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm

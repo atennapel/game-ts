@@ -33,6 +33,16 @@ class CloseDoor implements Action {
   }
 }
 
+class Bump implements Action {
+  readonly position: Pos;
+  readonly ratio: number;
+
+  constructor(position: Pos, ratio: number) {
+    this.position = position;
+    this.ratio = ratio;
+  }
+}
+
 class Main {
   private running: boolean = false;
   private lastTime: DOMHighResTimeStamp;
@@ -124,6 +134,7 @@ class Main {
           this.gy = this.my;
           const last = path.pop()!;
           const actions = path.map(p => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new CloseDoor(last));
           actions.reverse();
           this.actionStack = actions;
@@ -137,6 +148,7 @@ class Main {
           this.gy = this.my;
           const last = path.pop()!;
           const actions = path.map(p => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new OpenDoor(last));
           actions.reverse();
           this.actionStack = actions;
@@ -154,8 +166,22 @@ class Main {
           this.gy = this.my;
           const last = path.pop()!;
           const actions = path.map(p => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new OpenDoor(last));
           actions.push(new Move(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else if (tile == Tile.Wall) {
+        this.map.set(mx, my, Tile.Empty);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        this.map.set(mx, my, Tile.Wall);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop()!;
+          const actions = path.map(p => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.reverse();
           this.actionStack = actions;
         }
@@ -192,14 +218,14 @@ class Main {
   private logic(delta: number): void {
     let shouldRefreshVisiblity = false;
 
-    const actionStack = this.actionStack;
-    if (actionStack) {
-      if (actionStack.length > 0) {
-        if (!this.player.isAnimating()) {
+    if (!this.player.isAnimating()) {
+      const actionStack = this.actionStack;
+      if (actionStack) {
+        if (actionStack.length > 0) {
           const nextAction = actionStack.pop()!;
           if (nextAction instanceof Move) {
             const pos = nextAction.position;
-            this.player.offsetTowards(pos.x, pos.y);
+            this.player.move(pos.x, pos.y);
           } else if (nextAction instanceof OpenDoor) {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, Tile.OpenDoor);
@@ -208,9 +234,12 @@ class Main {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, Tile.ClosedDoor);
             shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof Bump) {
+            const pos = nextAction.position;
+            this.player.bump(pos.x, pos.y, nextAction.ratio);
           }
-        }
-      } else this.actionStack = null;
+        } else this.actionStack = null;
+      }
     }
 
     // update player animation

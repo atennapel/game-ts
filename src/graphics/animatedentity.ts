@@ -1,12 +1,16 @@
+import { approxEquals } from "../util";
+
 class AnimatedEntity {
   x: number;
   y: number;
   absoluteX: number;
   absoluteY: number;
-  private offsetX: number = 0;
-  private offsetY: number = 0;
+  private goalX: number;
+  private goalY: number;
   private spriteWidth: number;
   private spriteHeight: number;
+  private animating: boolean = false;
+  private bumping: boolean = false;
   animationSpeed: number = 0.25;
 
   constructor(x: number, y: number, spriteWidth: number, spriteHeight: number) {
@@ -14,84 +18,75 @@ class AnimatedEntity {
     this.y = y;
     this.absoluteX = x * spriteWidth;
     this.absoluteY = y * spriteHeight;
+    this.goalX = this.absoluteX;
+    this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
   }
 
   isAnimating(): boolean {
-    return this.offsetX != 0 || this.offsetY != 0;
+    return this.animating;
   }
 
-  offset(dx: number, dy: number): void {
-    this.offsetX = dx * this.spriteWidth;
-    this.offsetY = dy * this.spriteHeight;
+  move(x: number, y: number): void {
+    this.animating = true;
+    this.goalX = x * this.spriteWidth;
+    this.goalY = y * this.spriteHeight;
   }
 
-  offsetTowards(x: number, y: number): void {
-    if (x > this.x) this.offsetX = this.spriteWidth;
-    else if (x < this.x) this.offsetX = -this.spriteWidth;
-    if (y > this.y) this.offsetY = this.spriteHeight;
-    else if (y < this.y) this.offsetY = -this.spriteHeight;
+  bump(x: number, y: number, ratio: number): void {
+    this.animating = true;
+    this.bumping = true;
+    const dx = x - this.x;
+    const dy = y - this.y;
+    this.goalX = this.absoluteX + dx * this.spriteWidth * ratio;
+    this.goalY = this.absoluteY + dy * this.spriteHeight * ratio;
   }
 
-  // TODO: bumping
-
+  // returns true if visiblity should be refreshed
   update(delta: number): boolean {
-    let x = this.x;
-    let y = this.y;
-    let ox = this.offsetX;
-    let oy = this.offsetY;
-    let shouldRefreshVisiblity = false;
+    if (!this.animating) return false;
 
-    if (ox > 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteX += dist;
-      ox -= dist;
-      if (ox < 0.1) {
-        ox = 0;
-        x += 1;
-        this.absoluteX = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (ox < 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteX -= dist;
-      ox += dist;
-      if (ox > -0.1) {
-        ox = 0;
-        x -= 1;
-        this.absoluteX = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    }
-    if (oy > 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteY += dist;
-      oy -= dist;
-      if (oy < 0.1) {
-        oy = 0;
-        y += 1;
-        this.absoluteY = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (oy < 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteY -= dist;
-      oy += dist;
-      if (oy > -0.1) {
-        oy = 0;
-        y -= 1;
-        this.absoluteY = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
+    let gx = this.goalX;
+    let gy = this.goalY;
+    let ax = this.absoluteX;
+    let ay = this.absoluteY;
+
+    if (gx == ax && gy == ay) {
+      if (this.bumping) {
+        this.bumping = false;
+        gx = this.x * this.spriteWidth;
+        gy = this.y * this.spriteHeight;
+      } else {
+        this.animating = false;
+        this.x = Math.floor(gx / this.spriteWidth);
+        this.y = Math.floor(gy / this.spriteHeight);
+        return true;
       }
     }
 
-    this.x = x;
-    this.y = y;
-    this.offsetX = ox;
-    this.offsetY = oy;
+    const change = delta * this.animationSpeed;
+    if (ax < gx) {
+      ax += change;
+      if (ax > gx) ax = gx;
+    } else if (ax > gx) {
+      ax -= change;
+      if (ax < gx) ax = gx;
+    }
+    if (ay < gy) {
+      ay += change;
+      if (ay > gy) ay = gy;
+    } else if (ay > gy) {
+      ay -= change;
+      if (ay < gy) ay = gy;
+    }
 
-    return shouldRefreshVisiblity;
+    this.goalX = gx;
+    this.goalY = gy;
+    this.absoluteX = ax;
+    this.absoluteY = ay;
+
+    return false;
   }
 }
 

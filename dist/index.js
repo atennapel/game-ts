@@ -485,86 +485,78 @@ var AnimatedEntity = class {
   y;
   absoluteX;
   absoluteY;
-  offsetX = 0;
-  offsetY = 0;
+  goalX;
+  goalY;
   spriteWidth;
   spriteHeight;
+  animating = false;
+  bumping = false;
   animationSpeed = 0.25;
   constructor(x, y, spriteWidth, spriteHeight) {
     this.x = x;
     this.y = y;
     this.absoluteX = x * spriteWidth;
     this.absoluteY = y * spriteHeight;
+    this.goalX = this.absoluteX;
+    this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
     this.spriteHeight = spriteHeight;
   }
   isAnimating() {
-    return this.offsetX != 0 || this.offsetY != 0;
+    return this.animating;
   }
-  offset(dx, dy) {
-    this.offsetX = dx * this.spriteWidth;
-    this.offsetY = dy * this.spriteHeight;
+  move(x, y) {
+    this.animating = true;
+    this.goalX = x * this.spriteWidth;
+    this.goalY = y * this.spriteHeight;
   }
-  offsetTowards(x, y) {
-    if (x > this.x) this.offsetX = this.spriteWidth;
-    else if (x < this.x) this.offsetX = -this.spriteWidth;
-    if (y > this.y) this.offsetY = this.spriteHeight;
-    else if (y < this.y) this.offsetY = -this.spriteHeight;
+  bump(x, y, ratio) {
+    this.animating = true;
+    this.bumping = true;
+    const dx = x - this.x;
+    const dy = y - this.y;
+    this.goalX = this.absoluteX + dx * this.spriteWidth * ratio;
+    this.goalY = this.absoluteY + dy * this.spriteHeight * ratio;
   }
-  // TODO: bumping
+  // returns true if visiblity should be refreshed
   update(delta) {
-    let x = this.x;
-    let y = this.y;
-    let ox = this.offsetX;
-    let oy = this.offsetY;
-    let shouldRefreshVisiblity = false;
-    if (ox > 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteX += dist;
-      ox -= dist;
-      if (ox < 0.1) {
-        ox = 0;
-        x += 1;
-        this.absoluteX = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (ox < 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteX -= dist;
-      ox += dist;
-      if (ox > -0.1) {
-        ox = 0;
-        x -= 1;
-        this.absoluteX = x * this.spriteWidth;
-        shouldRefreshVisiblity = true;
+    if (!this.animating) return false;
+    let gx = this.goalX;
+    let gy = this.goalY;
+    let ax = this.absoluteX;
+    let ay = this.absoluteY;
+    if (gx == ax && gy == ay) {
+      if (this.bumping) {
+        this.bumping = false;
+        gx = this.x * this.spriteWidth;
+        gy = this.y * this.spriteHeight;
+      } else {
+        this.animating = false;
+        this.x = Math.floor(gx / this.spriteWidth);
+        this.y = Math.floor(gy / this.spriteHeight);
+        return true;
       }
     }
-    if (oy > 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteY += dist;
-      oy -= dist;
-      if (oy < 0.1) {
-        oy = 0;
-        y += 1;
-        this.absoluteY = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
-    } else if (oy < 0) {
-      const dist = delta * this.animationSpeed;
-      this.absoluteY -= dist;
-      oy += dist;
-      if (oy > -0.1) {
-        oy = 0;
-        y -= 1;
-        this.absoluteY = y * this.spriteHeight;
-        shouldRefreshVisiblity = true;
-      }
+    const change = delta * this.animationSpeed;
+    if (ax < gx) {
+      ax += change;
+      if (ax > gx) ax = gx;
+    } else if (ax > gx) {
+      ax -= change;
+      if (ax < gx) ax = gx;
     }
-    this.x = x;
-    this.y = y;
-    this.offsetX = ox;
-    this.offsetY = oy;
-    return shouldRefreshVisiblity;
+    if (ay < gy) {
+      ay += change;
+      if (ay > gy) ay = gy;
+    } else if (ay > gy) {
+      ay -= change;
+      if (ay < gy) ay = gy;
+    }
+    this.goalX = gx;
+    this.goalY = gy;
+    this.absoluteX = ax;
+    this.absoluteY = ay;
+    return false;
   }
 };
 var animatedentity_default = AnimatedEntity;
@@ -685,6 +677,14 @@ var CloseDoor = class {
     this.position = position;
   }
 };
+var Bump = class {
+  position;
+  ratio;
+  constructor(position, ratio) {
+    this.position = position;
+    this.ratio = ratio;
+  }
+};
 var Main = class {
   running = false;
   lastTime;
@@ -761,6 +761,7 @@ var Main = class {
           this.gy = this.my;
           const last = path.pop();
           const actions = path.map((p) => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new CloseDoor(last));
           actions.reverse();
           this.actionStack = actions;
@@ -774,6 +775,7 @@ var Main = class {
           this.gy = this.my;
           const last = path.pop();
           const actions = path.map((p) => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new OpenDoor(last));
           actions.reverse();
           this.actionStack = actions;
@@ -790,8 +792,22 @@ var Main = class {
           this.gy = this.my;
           const last = path.pop();
           const actions = path.map((p) => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.push(new OpenDoor(last));
           actions.push(new Move(last));
+          actions.reverse();
+          this.actionStack = actions;
+        }
+      } else if (tile == tile_default.Wall) {
+        this.map.set(mx, my, tile_default.Empty);
+        const path = this.pathfinding.findPath(this.player.x, this.player.y, mx, my);
+        this.map.set(mx, my, tile_default.Wall);
+        if (path && path.length > 0) {
+          this.gx = this.mx;
+          this.gy = this.my;
+          const last = path.pop();
+          const actions = path.map((p) => new Move(p));
+          actions.push(new Bump(last, 0.25));
           actions.reverse();
           this.actionStack = actions;
         }
@@ -821,14 +837,14 @@ var Main = class {
   }
   logic(delta) {
     let shouldRefreshVisiblity = false;
-    const actionStack = this.actionStack;
-    if (actionStack) {
-      if (actionStack.length > 0) {
-        if (!this.player.isAnimating()) {
+    if (!this.player.isAnimating()) {
+      const actionStack = this.actionStack;
+      if (actionStack) {
+        if (actionStack.length > 0) {
           const nextAction = actionStack.pop();
           if (nextAction instanceof Move) {
             const pos = nextAction.position;
-            this.player.offsetTowards(pos.x, pos.y);
+            this.player.move(pos.x, pos.y);
           } else if (nextAction instanceof OpenDoor) {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, tile_default.OpenDoor);
@@ -837,9 +853,12 @@ var Main = class {
             const pos = nextAction.position;
             this.map.set(pos.x, pos.y, tile_default.ClosedDoor);
             shouldRefreshVisiblity = true;
+          } else if (nextAction instanceof Bump) {
+            const pos = nextAction.position;
+            this.player.bump(pos.x, pos.y, nextAction.ratio);
           }
-        }
-      } else this.actionStack = null;
+        } else this.actionStack = null;
+      }
     }
     shouldRefreshVisiblity = shouldRefreshVisiblity || this.player.update(delta);
     if (shouldRefreshVisiblity)
