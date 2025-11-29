@@ -9,6 +9,7 @@ import GraphicsEntity from "./graphicsentity";
 import Color from "./color";
 import Sprites from "./sprites";
 import graphicsTiles from "./tiles/graphicstiles";
+import Entity from "../logic/entities/entity";
 
 class Main {
   private readonly width: number = 20;
@@ -20,8 +21,8 @@ class Main {
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
-  private player: GraphicsEntity = new GraphicsEntity(this.world.player, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
-  private monster: GraphicsEntity = new GraphicsEntity(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
+  private entities: GraphicsEntity[] = this.world.entities.map(e => this.createGraphicsEntity(e));
+  private player: GraphicsEntity = this.entities.find(e => e.isPlayer())!;
 
   private mx: number = 0;
   private my: number = 0;
@@ -39,6 +40,12 @@ class Main {
   private tileCycleAcc: number = 0;
   private tileCycleSpeed: number = 64;
   private tileCycleMax: number = 60;
+
+  private createGraphicsEntity(entity: Entity): GraphicsEntity {
+    if (entity.isPlayer())
+      return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
+    return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
+  }
 
   async initialize(
     canvasId: string,
@@ -122,8 +129,9 @@ class Main {
     }
 
     // entity update
-    this.player.update(this.game, delta);
-    this.monster.update(this.game, delta);
+    const entities = this.entities;
+    for (let i = 0; i < entities.length; i++)
+      entities[i].update(this.game, delta);
   }
 
   private draw(): void {
@@ -168,9 +176,12 @@ class Main {
     }
 
     // draw entities
-    if (this.map.isVisible(this.monster.x, this.monster.y))
-      this.drawEntity(this.monster);
-    this.drawEntity(this.player);
+    const entities = this.entities;
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i];
+      if (entity.isPlayer() || this.map.isVisible(entity.x, entity.y))
+        this.drawEntity(entity);
+    }
 
     // draw goal
     if (!this.player.isIdle())
@@ -196,6 +207,14 @@ class Main {
     this.ctx!.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
     this.ctx!.fillStyle = "black";
     this.ctx!.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
+
+    // draw position
+    const posText = `pos: ${this.mx}, ${this.my}`;
+    this.ctx!.font = "12px monospace"
+    this.ctx!.fillStyle = "white";
+    this.ctx!.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    this.ctx!.fillStyle = "black";
+    this.ctx!.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
   }
 
   private drawRect(x: number, y: number, style: string): void {

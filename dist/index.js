@@ -7,11 +7,13 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["ClosedDoor"] = 2] = "ClosedDoor";
   Tile2[Tile2["OpenDoor"] = 3] = "OpenDoor";
   Tile2[Tile2["Fire"] = 4] = "Fire";
+  Tile2[Tile2["Chair"] = 5] = "Chair";
+  Tile2[Tile2["Table"] = 6] = "Table";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
   function isBlocked(tile) {
-    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */ || tile == 4 /* Fire */;
+    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */ || tile == 4 /* Fire */ || tile == 6 /* Table */;
   }
   Tile2.isBlocked = isBlocked;
   function blocksView(tile) {
@@ -19,10 +21,20 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   }
   Tile2.blocksView = blocksView;
   function description(tile) {
-    if (tile == 2 /* ClosedDoor */) return "door (closed)";
-    else if (tile == 3 /* OpenDoor */) return "door (open)";
-    else if (tile == 4 /* Fire */) return "fire";
-    return null;
+    switch (tile) {
+      case 2 /* ClosedDoor */:
+        return "door (closed)";
+      case 3 /* OpenDoor */:
+        return "door (open)";
+      case 4 /* Fire */:
+        return "fire";
+      case 5 /* Chair */:
+        return "chair";
+      case 6 /* Table */:
+        return "table";
+      default:
+        return null;
+    }
   }
   Tile2.description = description;
 })(Tile || (Tile = {}));
@@ -739,11 +751,12 @@ var map_default = Map2;
 var World = class {
   map;
   player;
-  npc;
+  entities = [];
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
-    this.npc = new npc_default(2, 2);
+    this.entities.push(this.player);
+    this.entities.push(new npc_default(2, 2));
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
@@ -757,6 +770,9 @@ var World = class {
       }
     }
     this.map.set(8, 4, tile_default.Fire);
+    this.map.set(7, 9, tile_default.Chair);
+    this.map.set(8, 9, tile_default.Table);
+    this.map.set(9, 9, tile_default.Chair);
   }
 };
 var world_default = World;
@@ -922,13 +938,14 @@ var Color = class _Color {
   equals(other) {
     return this.r == other.r && this.g == other.g && this.b == other.b && this.a == other.a;
   }
+  static Transparent = new _Color(0, 0, 0, 0);
   static White = new _Color(255, 255, 255, 255);
   static Black = new _Color(0, 0, 0, 255);
   static Grey = new _Color(127, 127, 127, 255);
   static Red = new _Color(255, 0, 0, 255);
   static Blue = new _Color(0, 255, 0, 255);
   static Green = new _Color(0, 0, 255, 255);
-  static Transparent = new _Color(0, 0, 0, 0);
+  static Brown = new _Color(150, 75, 0, 255);
 };
 var color_default = Color;
 
@@ -1065,7 +1082,11 @@ var tiles = [
   // OpenDoor
   new statictile_default(3, color_default.Transparent, color_default.Black),
   // Fire
-  new animatedtile_default([4, 5, 6, 7], [color_default.Transparent], [color_default.Red, new color_default(155, 0, 0, 255)], 2, 2)
+  new animatedtile_default([4, 5], [color_default.Transparent], [color_default.Red, new color_default(155, 0, 0, 255)], 2, 2),
+  // Chair
+  new statictile_default(6, color_default.Transparent, color_default.Brown),
+  // Table
+  new statictile_default(7, color_default.Transparent, color_default.Brown)
 ];
 var graphicstiles_default = tiles;
 
@@ -1078,8 +1099,8 @@ var Main = class {
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
-  player = new graphicsentity_default(this.world.player, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
-  monster = new graphicsentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
+  entities = this.world.entities.map((e) => this.createGraphicsEntity(e));
+  player = this.entities.find((e) => e.isPlayer());
   mx = 0;
   my = 0;
   gx = 0;
@@ -1093,6 +1114,11 @@ var Main = class {
   tileCycleAcc = 0;
   tileCycleSpeed = 64;
   tileCycleMax = 60;
+  createGraphicsEntity(entity) {
+    if (entity.isPlayer())
+      return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
+    return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
+  }
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
     this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -1155,8 +1181,9 @@ var Main = class {
       if (this.tileCycleIndex >= this.tileCycleMax)
         this.tileCycleIndex = 0;
     }
-    this.player.update(this.game, delta);
-    this.monster.update(this.game, delta);
+    const entities = this.entities;
+    for (let i = 0; i < entities.length; i++)
+      entities[i].update(this.game, delta);
   }
   draw() {
     this.ctx.fillStyle = "white";
@@ -1195,9 +1222,12 @@ var Main = class {
         }
       }
     }
-    if (this.map.isVisible(this.monster.x, this.monster.y))
-      this.drawEntity(this.monster);
-    this.drawEntity(this.player);
+    const entities = this.entities;
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i];
+      if (entity.isPlayer() || this.map.isVisible(entity.x, entity.y))
+        this.drawEntity(entity);
+    }
     if (!this.player.isIdle())
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
     this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
@@ -1215,6 +1245,12 @@ var Main = class {
     this.ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
     this.ctx.fillStyle = "black";
     this.ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
+    const posText = `pos: ${this.mx}, ${this.my}`;
+    this.ctx.font = "12px monospace";
+    this.ctx.fillStyle = "white";
+    this.ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    this.ctx.fillStyle = "black";
+    this.ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
   }
   drawRect(x, y, style) {
     this.ctx.fillStyle = style;

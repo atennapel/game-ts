@@ -4,11 +4,13 @@ enum Tile {
   ClosedDoor,
   OpenDoor,
   Fire,
+  Chair,
+  Table,
 }
 
 namespace Tile {
   export function isBlocked(tile: Tile): boolean {
-    return tile == Tile.Wall || tile == Tile.ClosedDoor || tile == Tile.Fire;
+    return tile == Tile.Wall || tile == Tile.ClosedDoor || tile == Tile.Fire || tile == Tile.Table;
   }
 
   export function blocksView(tile: Tile): boolean {
@@ -16,10 +18,14 @@ namespace Tile {
   }
 
   export function description(tile: Tile): string | null {
-    if (tile == Tile.ClosedDoor) return "door (closed)";
-    else if (tile == Tile.OpenDoor) return "door (open)";
-    else if (tile == Tile.Fire) return "fire";
-    return null;
+    switch (tile) {
+      case Tile.ClosedDoor: return "door (closed)";
+      case Tile.OpenDoor: return "door (open)";
+      case Tile.Fire: return "fire";
+      case Tile.Chair: return "chair";
+      case Tile.Table: return "table";
+      default: return null;
+    }
   }
 }
 

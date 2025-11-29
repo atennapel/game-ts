@@ -13,7 +13,7 @@ TODO:
 - [x] Bumping animation
 - [x] NPCs
 - [x] Improve tile management
-- [ ] Improve entity management
+- [x] Improve entity management
 - [ ] Turn-based system
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 
