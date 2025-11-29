@@ -6,11 +6,19 @@ enum Tile {
   Fire,
   Chair,
   Table,
+  Computer,
 }
 
 namespace Tile {
   export function isBlocked(tile: Tile): boolean {
-    return tile == Tile.Wall || tile == Tile.ClosedDoor || tile == Tile.Fire || tile == Tile.Table;
+    switch (tile) {
+      case Tile.Wall: return true;
+      case Tile.ClosedDoor: return true;
+      case Tile.Fire: return true;
+      case Tile.Table: return true;
+      case Tile.Computer: return true;
+      default: return false;
+    }
   }
 
   export function blocksView(tile: Tile): boolean {
@@ -24,6 +32,7 @@ namespace Tile {
       case Tile.Fire: return "fire";
       case Tile.Chair: return "chair";
       case Tile.Table: return "table";
+      case Tile.Computer: return "computer";
       default: return null;
     }
   }

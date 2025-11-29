@@ -19,6 +19,7 @@ TODO:
 
 Questions:
 - Should refresh visiblity be an action so that it can happen after the move animation, instead of straight away?
+- How to handle the different background colors and tiles? Should tiles be layered?
 
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm

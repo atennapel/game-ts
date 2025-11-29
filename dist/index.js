@@ -9,11 +9,25 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Fire"] = 4] = "Fire";
   Tile2[Tile2["Chair"] = 5] = "Chair";
   Tile2[Tile2["Table"] = 6] = "Table";
+  Tile2[Tile2["Computer"] = 7] = "Computer";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
   function isBlocked(tile) {
-    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */ || tile == 4 /* Fire */ || tile == 6 /* Table */;
+    switch (tile) {
+      case 1 /* Wall */:
+        return true;
+      case 2 /* ClosedDoor */:
+        return true;
+      case 4 /* Fire */:
+        return true;
+      case 6 /* Table */:
+        return true;
+      case 7 /* Computer */:
+        return true;
+      default:
+        return false;
+    }
   }
   Tile2.isBlocked = isBlocked;
   function blocksView(tile) {
@@ -32,6 +46,8 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
         return "chair";
       case 6 /* Table */:
         return "table";
+      case 7 /* Computer */:
+        return "computer";
       default:
         return null;
     }
@@ -773,6 +789,7 @@ var World = class {
     this.map.set(7, 9, tile_default.Chair);
     this.map.set(8, 9, tile_default.Table);
     this.map.set(9, 9, tile_default.Chair);
+    this.map.set(9, 7, tile_default.Computer);
   }
 };
 var world_default = World;
@@ -942,6 +959,7 @@ var Color = class _Color {
   static White = new _Color(255, 255, 255, 255);
   static Black = new _Color(0, 0, 0, 255);
   static Grey = new _Color(127, 127, 127, 255);
+  static DarkGrey = new _Color(100, 100, 100, 255);
   static Red = new _Color(255, 0, 0, 255);
   static Blue = new _Color(0, 255, 0, 255);
   static Green = new _Color(0, 0, 255, 255);
@@ -1076,17 +1094,19 @@ var tiles = [
   // Empty
   new statictile_default(0, color_default.Transparent, color_default.Transparent),
   // Wall
-  new statictile_default(1, color_default.Transparent, color_default.Black),
-  // ClosedDoor
   new statictile_default(2, color_default.Transparent, color_default.Black),
-  // OpenDoor
+  // ClosedDoor
   new statictile_default(3, color_default.Transparent, color_default.Black),
+  // OpenDoor
+  new statictile_default(4, color_default.Transparent, color_default.Black),
   // Fire
-  new animatedtile_default([4, 5], [color_default.Transparent], [color_default.Red, new color_default(155, 0, 0, 255)], 2, 2),
+  new animatedtile_default([5, 6], [color_default.Transparent], [color_default.Red, new color_default(155, 0, 0, 255)], 2, 2),
   // Chair
-  new statictile_default(6, color_default.Transparent, color_default.Brown),
+  new statictile_default(7, color_default.Transparent, color_default.Brown),
   // Table
-  new statictile_default(7, color_default.Transparent, color_default.Brown)
+  new statictile_default(8, color_default.Transparent, color_default.Brown),
+  // Computer
+  new animatedtile_default([9, 10], [color_default.White], [color_default.DarkGrey], 4, 4)
 ];
 var graphicstiles_default = tiles;
 
@@ -1116,8 +1136,8 @@ var Main = class {
   tileCycleMax = 60;
   createGraphicsEntity(entity) {
     if (entity.isPlayer())
-      return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
-    return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
+      return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [1], [color_default.Black]);
+    return new graphicsentity_default(entity, this.spriteWidth, this.spriteHeight, [1], [color_default.Red]);
   }
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
     this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
@@ -1271,4 +1291,4 @@ var main_default = Main;
 
 // src/index.ts
 var main = new main_default();
-main.initialize("canvas", "images/sprites.bmp", 64, 32, 16, 16).then(() => main.start()).catch((err) => console.error(err));
+main.initialize("canvas", "images/sprites.bmp", 64, 64, 16, 16).then(() => main.start()).catch((err) => console.error(err));

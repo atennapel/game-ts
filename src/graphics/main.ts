@@ -43,8 +43,8 @@ class Main {
 
   private createGraphicsEntity(entity: Entity): GraphicsEntity {
     if (entity.isPlayer())
-      return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
-    return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
+      return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Black]);
+    return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Red]);
   }
 
   async initialize(

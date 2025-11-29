@@ -33,6 +33,7 @@ class World {
     this.map.set(7, 9, Tile.Chair);
     this.map.set(8, 9, Tile.Table);
     this.map.set(9, 9, Tile.Chair);
+    this.map.set(9, 7, Tile.Computer);
   }
 }
 
