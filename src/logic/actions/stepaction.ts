@@ -19,7 +19,7 @@ class StepAction extends Action {
       return null;
 
     actor.move(x, y);
-    if (actor.isPlayer()) game.refreshVisibility();
+    if (actor.isPlayer()) game.refreshVisibilityAt(x, y);
     return null;
   }
 }

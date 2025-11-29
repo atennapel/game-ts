@@ -4,7 +4,7 @@ import Entity from "../logic/entities/entity";
 import Game from "../logic/game";
 import Color from "./color";
 
-class AnimatedEntity implements Actor {
+class GraphicsEntity implements Actor {
   private entity: Entity;
 
   absoluteX: number;
@@ -78,8 +78,8 @@ class AnimatedEntity implements Actor {
   update(game: Game, delta: number): void {
     // animate sprite/color
     this.spriteCycleAcc += delta;
-    if (this.spriteCycleAcc >= this.spriteCycleSpeed) {
-      this.spriteCycleAcc = 0;
+    while (this.spriteCycleAcc >= this.spriteCycleSpeed) {
+      this.spriteCycleAcc -= this.spriteCycleSpeed;
       this.spriteIndex++;
       if (this.spriteIndex >= this.cycles)
         this.spriteIndex = 0;
@@ -101,8 +101,7 @@ class AnimatedEntity implements Actor {
         gy = this.entity.y * this.spriteHeight;
       } else {
         this.animating = false;
-        this.entity.x = Math.floor(gx / this.spriteWidth);
-        this.entity.y = Math.floor(gy / this.spriteHeight);
+        this.entity.move(Math.floor(gx / this.spriteWidth), Math.floor(gy / this.spriteHeight));
         return;
       }
     }
@@ -148,4 +147,4 @@ class AnimatedEntity implements Actor {
   }
 }
 
-export default AnimatedEntity;
+export default GraphicsEntity;

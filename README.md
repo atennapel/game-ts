@@ -12,9 +12,13 @@ TODO:
 - [x] Move player animation in separate class
 - [x] Bumping animation
 - [x] NPCs
-- [ ] Improve entity management and tile management
+- [x] Improve tile management
+- [ ] Improve entity management
 - [ ] Turn-based system
 - [ ] Fix issue with diagonals in the pathfinding algorithm
+
+Questions:
+- Should refresh visiblity be an action so that it can happen after the move animation, instead of straight away?
 
 ## References
 https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm

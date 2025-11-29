@@ -6,16 +6,22 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Wall"] = 1] = "Wall";
   Tile2[Tile2["ClosedDoor"] = 2] = "ClosedDoor";
   Tile2[Tile2["OpenDoor"] = 3] = "OpenDoor";
+  Tile2[Tile2["Fire"] = 4] = "Fire";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
   function isBlocked(tile) {
-    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */;
+    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */ || tile == 4 /* Fire */;
   }
   Tile2.isBlocked = isBlocked;
+  function blocksView(tile) {
+    return tile == 1 /* Wall */ || tile == 2 /* ClosedDoor */;
+  }
+  Tile2.blocksView = blocksView;
   function description(tile) {
     if (tile == 2 /* ClosedDoor */) return "door (closed)";
     else if (tile == 3 /* OpenDoor */) return "door (open)";
+    else if (tile == 4 /* Fire */) return "fire";
     return null;
   }
   Tile2.description = description;
@@ -63,7 +69,7 @@ var StepAction = class extends action_default {
     if (game.world.map.isBlocked(x, y))
       return null;
     actor.move(x, y);
-    if (actor.isPlayer()) game.refreshVisibility();
+    if (actor.isPlayer()) game.refreshVisibilityAt(x, y);
     return null;
   }
 };
@@ -570,7 +576,7 @@ var ShadowCasting = class _ShadowCasting {
           const proj = Shadow.projectTile(row, col);
           const visible = !line.isInShadow(proj);
           this.map.setVisible(posX, posY, visible);
-          if (visible && this.map.isBlocked(posX, posY)) {
+          if (visible && this.map.blocksView(posX, posY)) {
             line.add(proj);
             fullShadow = line.isFullShadow();
           }
@@ -631,6 +637,12 @@ var Entity = class {
       return true;
     } else return false;
   }
+  move(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  bump(x, y) {
+  }
 };
 var entity_default = Entity;
 
@@ -658,16 +670,6 @@ var Player = class extends entity_default {
   }
 };
 var player_default = Player;
-
-// src/logic/entities/staticentity.ts
-var StaticEntity = class extends entity_default {
-  isPlayer() {
-    return false;
-  }
-  decideNextAction(game) {
-  }
-};
-var staticentity_default = StaticEntity;
 
 // src/util.ts
 function array2d(width, height, value) {
@@ -704,6 +706,9 @@ var Map2 = class {
   isBlocked(x, y) {
     return tile_default.isBlocked(this.map[x][y]);
   }
+  blocksView(x, y) {
+    return tile_default.blocksView(this.map[x][y]);
+  }
   isVisible(x, y) {
     return this.visible[x][y];
   }
@@ -735,12 +740,10 @@ var World = class {
   map;
   player;
   npc;
-  fire;
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
     this.npc = new npc_default(2, 2);
-    this.fire = new staticentity_default(10, 4);
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x == 0 || x == width - 1 || y == 0 || y == height - 1)
@@ -753,6 +756,7 @@ var World = class {
           this.map.set(x, y, tile_default.ClosedDoor);
       }
     }
+    this.map.set(8, 4, tile_default.Fire);
   }
 };
 var world_default = World;
@@ -774,11 +778,14 @@ var Game = class {
     const player = this.world.player;
     this.shadowcasting.refreshVisibility(player.x, player.y);
   }
+  refreshVisibilityAt(x, y) {
+    this.shadowcasting.refreshVisibility(x, y);
+  }
 };
 var game_default = Game;
 
-// src/graphics/animatedentity.ts
-var AnimatedEntity = class {
+// src/graphics/graphicsentity.ts
+var GraphicsEntity = class {
   entity;
   absoluteX;
   absoluteY;
@@ -841,8 +848,8 @@ var AnimatedEntity = class {
   }
   update(game, delta) {
     this.spriteCycleAcc += delta;
-    if (this.spriteCycleAcc >= this.spriteCycleSpeed) {
-      this.spriteCycleAcc = 0;
+    while (this.spriteCycleAcc >= this.spriteCycleSpeed) {
+      this.spriteCycleAcc -= this.spriteCycleSpeed;
       this.spriteIndex++;
       if (this.spriteIndex >= this.cycles)
         this.spriteIndex = 0;
@@ -859,8 +866,7 @@ var AnimatedEntity = class {
         gy = this.entity.y * this.spriteHeight;
       } else {
         this.animating = false;
-        this.entity.x = Math.floor(gx / this.spriteWidth);
-        this.entity.y = Math.floor(gy / this.spriteHeight);
+        this.entity.move(Math.floor(gx / this.spriteWidth), Math.floor(gy / this.spriteHeight));
         return;
       }
     }
@@ -899,7 +905,7 @@ var AnimatedEntity = class {
     return this.entity.isIdle();
   }
 };
-var animatedentity_default = AnimatedEntity;
+var graphicsentity_default = GraphicsEntity;
 
 // src/graphics/color.ts
 var Color = class _Color {
@@ -998,6 +1004,71 @@ var Sprites = class _Sprites {
 };
 var sprites_default = Sprites;
 
+// src/graphics/tiles/graphicstile.ts
+var GraphicsTile = class {
+};
+var graphicstile_default = GraphicsTile;
+
+// src/graphics/tiles/animatedtile.ts
+var AnimatedTile = class extends graphicstile_default {
+  sprites;
+  background;
+  foreground;
+  spriteAnimationSpeed;
+  colorAnimationSpeed;
+  constructor(sprites, background, foreground, spriteAnimationSpeed, colorAnimationSpeed) {
+    super();
+    this.sprites = sprites;
+    this.background = background;
+    this.foreground = foreground;
+    this.spriteAnimationSpeed = spriteAnimationSpeed;
+    this.colorAnimationSpeed = colorAnimationSpeed;
+  }
+  sprite(index) {
+    return this.sprites[Math.floor(index / this.spriteAnimationSpeed) % this.sprites.length];
+  }
+  color(index, background) {
+    const i = Math.floor(index / this.colorAnimationSpeed);
+    return background ? this.background[i % this.background.length] : this.foreground[i % this.foreground.length];
+  }
+};
+var animatedtile_default = AnimatedTile;
+
+// src/graphics/tiles/statictile.ts
+var StaticTile = class extends graphicstile_default {
+  mySprite;
+  background;
+  foreground;
+  constructor(sprite, background, foreground) {
+    super();
+    this.mySprite = sprite;
+    this.background = background;
+    this.foreground = foreground;
+  }
+  sprite(index) {
+    return this.mySprite;
+  }
+  color(index, background) {
+    return background ? this.background : this.foreground;
+  }
+};
+var statictile_default = StaticTile;
+
+// src/graphics/tiles/graphicstiles.ts
+var tiles = [
+  // Empty
+  new statictile_default(0, color_default.Transparent, color_default.Transparent),
+  // Wall
+  new statictile_default(1, color_default.Transparent, color_default.Black),
+  // ClosedDoor
+  new statictile_default(2, color_default.Transparent, color_default.Black),
+  // OpenDoor
+  new statictile_default(3, color_default.Transparent, color_default.Black),
+  // Fire
+  new animatedtile_default([4, 5, 6, 7], [color_default.Transparent], [color_default.Red, new color_default(155, 0, 0, 255)], 2, 2)
+];
+var graphicstiles_default = tiles;
+
 // src/graphics/main.ts
 var Main = class {
   width = 20;
@@ -1007,9 +1078,8 @@ var Main = class {
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
-  player = new animatedentity_default(this.world.player, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
-  monster = new animatedentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
-  fire = new animatedentity_default(this.world.fire, this.spriteWidth, this.spriteHeight, [4, 5, 6, 7], [color_default.Red, new color_default(155, 0, 0, 255)]);
+  player = new graphicsentity_default(this.world.player, this.spriteWidth, this.spriteHeight, [0], [color_default.Black]);
+  monster = new graphicsentity_default(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [color_default.Red]);
   mx = 0;
   my = 0;
   gx = 0;
@@ -1019,6 +1089,10 @@ var Main = class {
   running = false;
   lastTime = 0;
   fps = 0;
+  tileCycleIndex = 0;
+  tileCycleAcc = 0;
+  tileCycleSpeed = 64;
+  tileCycleMax = 60;
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
     this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -1074,18 +1148,53 @@ var Main = class {
     requestAnimationFrame((time2) => this.loop(time2));
   }
   logic(delta) {
+    this.tileCycleAcc += delta;
+    while (this.tileCycleAcc >= this.tileCycleSpeed) {
+      this.tileCycleAcc -= this.tileCycleSpeed;
+      this.tileCycleIndex++;
+      if (this.tileCycleIndex >= this.tileCycleMax)
+        this.tileCycleIndex = 0;
+    }
     this.player.update(this.game, delta);
-    this.fire.update(this.game, delta);
     this.monster.update(this.game, delta);
   }
   draw() {
+    this.ctx.fillStyle = "white";
+    this.ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+    const tileSpriteCache = [];
+    const tileBackgroundCache = [];
+    const tileForegroundCache = [];
+    const index = this.tileCycleIndex;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        this.drawTile(x, y);
+        const map = this.map;
+        const visible = map.isVisible(x, y);
+        const tile = map.get(x, y);
+        let sprite;
+        let foreground;
+        let background = tileBackgroundCache[tile];
+        if (tileBackgroundCache[tile]) {
+          sprite = tileSpriteCache[tile];
+          foreground = tileForegroundCache[tile];
+        } else {
+          const graphicstile = graphicstiles_default[tile];
+          sprite = graphicstile.sprite(index);
+          background = graphicstile.color(index, true);
+          foreground = graphicstile.color(index, false);
+          tileSpriteCache[tile] = sprite;
+          tileBackgroundCache[tile] = background;
+          tileForegroundCache[tile] = foreground;
+        }
+        if (visible) {
+          this.drawSprite(sprite, x, y, foreground, background);
+        } else if (map.isExplored(x, y)) {
+          this.drawSprite(sprite, x, y, foreground, background);
+          this.drawRect(x, y, "rgba(0, 0, 0, 0.5)");
+        } else {
+          this.drawRect(x, y, "black");
+        }
       }
     }
-    if (this.map.isVisible(this.fire.x, this.fire.y))
-      this.drawEntity(this.fire);
     if (this.map.isVisible(this.monster.x, this.monster.y))
       this.drawEntity(this.monster);
     this.drawEntity(this.player);
@@ -1096,7 +1205,7 @@ var Main = class {
     if (tileText) {
       this.ctx.font = "12px monospace";
       this.ctx.fillStyle = "white";
-      this.ctx.fillRect(0, 0, tileText.length * 8, 16);
+      this.ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
       this.ctx.fillStyle = "black";
       this.ctx.fillText(tileText, 5, 10);
     }
@@ -1107,34 +1216,6 @@ var Main = class {
     this.ctx.fillStyle = "black";
     this.ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
   }
-  drawTile(x, y) {
-    const map = this.map;
-    const visible = map.isVisible(x, y);
-    const tile = map.get(x, y);
-    if (visible) {
-      if (tile == tile_default.Wall)
-        this.drawSprite(1, x, y, color_default.Black);
-      else if (tile == tile_default.ClosedDoor)
-        this.drawSprite(2, x, y, color_default.Black);
-      else if (tile == tile_default.OpenDoor)
-        this.drawSprite(3, x, y, color_default.Black);
-      else
-        this.drawRect(x, y, "white");
-    } else {
-      if (map.isExplored(x, y)) {
-        if (tile == tile_default.Wall)
-          this.drawSprite(1, x, y, color_default.Grey);
-        else if (tile == tile_default.ClosedDoor)
-          this.drawSprite(2, x, y, color_default.Grey);
-        else if (tile == tile_default.OpenDoor)
-          this.drawSprite(3, x, y, color_default.Grey);
-        else
-          this.drawRect(x, y, "grey");
-      } else {
-        this.drawRect(x, y, "black");
-      }
-    }
-  }
   drawRect(x, y, style) {
     this.ctx.fillStyle = style;
     this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
@@ -1143,8 +1224,8 @@ var Main = class {
     const image = this.sprites.get(index, background, foreground);
     if (image) this.ctx.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
-  drawSprite(index, x, y, foreground) {
-    this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground);
+  drawSprite(index, x, y, foreground, background = color_default.White) {
+    this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground, background);
   }
   drawEntity(entity) {
     this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, color_default.Transparent);

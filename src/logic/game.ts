@@ -22,6 +22,10 @@ class Game {
     const player = this.world.player;
     this.shadowcasting.refreshVisibility(player.x, player.y);
   }
+
+  refreshVisibilityAt(x: number, y: number) {
+    this.shadowcasting.refreshVisibility(x, y);
+  }
 }
 
 export default Game;

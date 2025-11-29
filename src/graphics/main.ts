@@ -5,9 +5,10 @@ import Map from "../logic/map";
 import Pos from "../logic/pos";
 import Tile from "../logic/tile";
 import World from "../logic/world";
-import AnimatedEntity from "./animatedentity";
+import GraphicsEntity from "./graphicsentity";
 import Color from "./color";
 import Sprites from "./sprites";
+import graphicsTiles from "./tiles/graphicstiles";
 
 class Main {
   private readonly width: number = 20;
@@ -19,9 +20,8 @@ class Main {
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
-  private player: AnimatedEntity = new AnimatedEntity(this.world.player, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
-  private monster: AnimatedEntity = new AnimatedEntity(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
-  private fire: AnimatedEntity = new AnimatedEntity(this.world.fire, this.spriteWidth, this.spriteHeight, [4, 5, 6, 7], [Color.Red, new Color(155, 0, 0, 255)]);
+  private player: GraphicsEntity = new GraphicsEntity(this.world.player, this.spriteWidth, this.spriteHeight, [0], [Color.Black]);
+  private monster: GraphicsEntity = new GraphicsEntity(this.world.npc, this.spriteWidth, this.spriteHeight, [0], [Color.Red]);
 
   private mx: number = 0;
   private my: number = 0;
@@ -34,6 +34,11 @@ class Main {
   private running: boolean = false;
   private lastTime: DOMHighResTimeStamp = 0;
   private fps: number = 0;
+
+  private tileCycleIndex: number = 0;
+  private tileCycleAcc: number = 0;
+  private tileCycleSpeed: number = 64;
+  private tileCycleMax: number = 60;
 
   async initialize(
     canvasId: string,
@@ -101,29 +106,68 @@ class Main {
     this.fps = 1000 / delta;
 
     this.logic(delta);
-
     this.draw();
 
     requestAnimationFrame(time => this.loop(time));
   }
 
   private logic(delta: number): void {
+    // tile animations
+    this.tileCycleAcc += delta;
+    while (this.tileCycleAcc >= this.tileCycleSpeed) {
+      this.tileCycleAcc -= this.tileCycleSpeed;
+      this.tileCycleIndex++;
+      if (this.tileCycleIndex >= this.tileCycleMax)
+        this.tileCycleIndex = 0;
+    }
+
+    // entity update
     this.player.update(this.game, delta);
-    this.fire.update(this.game, delta);
     this.monster.update(this.game, delta);
   }
 
   private draw(): void {
+    // clear canvas
+    this.ctx!.fillStyle = "white";
+    this.ctx!.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+
     // draw map
+    const tileSpriteCache: number[] = [];
+    const tileBackgroundCache: Color[] = [];
+    const tileForegroundCache: Color[] = [];
+    const index = this.tileCycleIndex;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        this.drawTile(x, y);
+        const map = this.map;
+        const visible = map.isVisible(x, y);
+        const tile = map.get(x, y);
+        let sprite;
+        let foreground;
+        let background = tileBackgroundCache[tile];
+        if (tileBackgroundCache[tile]) {
+          sprite = tileSpriteCache[tile];
+          foreground = tileForegroundCache[tile];
+        } else {
+          const graphicstile = graphicsTiles[tile];
+          sprite = graphicstile.sprite(index);
+          background = graphicstile.color(index, true);
+          foreground = graphicstile.color(index, false);
+          tileSpriteCache[tile] = sprite;
+          tileBackgroundCache[tile] = background;
+          tileForegroundCache[tile] = foreground;
+        }
+        if (visible) {
+          this.drawSprite(sprite, x, y, foreground, background);
+        } else if (map.isExplored(x, y)) {
+          this.drawSprite(sprite, x, y, foreground, background);
+          this.drawRect(x, y, "rgba(0, 0, 0, 0.5)");
+        } else {
+          this.drawRect(x, y, "black");
+        }
       }
     }
 
     // draw entities
-    if (this.map.isVisible(this.fire.x, this.fire.y))
-      this.drawEntity(this.fire);
     if (this.map.isVisible(this.monster.x, this.monster.y))
       this.drawEntity(this.monster);
     this.drawEntity(this.player);
@@ -140,7 +184,7 @@ class Main {
     if (tileText) {
       this.ctx!.font = "12px monospace";
       this.ctx!.fillStyle = "white";
-      this.ctx!.fillRect(0, 0, tileText.length * 8, 16);
+      this.ctx!.fillRect(0, 0, tileText.length * 8 + 5, 16);
       this.ctx!.fillStyle = "black";
       this.ctx!.fillText(tileText, 5, 10);
     }
@@ -154,35 +198,6 @@ class Main {
     this.ctx!.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
   }
 
-  private drawTile(x: number, y: number): void {
-    const map = this.map;
-    const visible = map.isVisible(x, y);
-    const tile = map.get(x, y);
-    if (visible) {
-      if (tile == Tile.Wall)
-        this.drawSprite(1, x, y, Color.Black);
-      else if (tile == Tile.ClosedDoor)
-        this.drawSprite(2, x, y, Color.Black);
-      else if (tile == Tile.OpenDoor)
-        this.drawSprite(3, x, y, Color.Black);
-      else
-        this.drawRect(x, y, "white");
-    } else {
-      if (map.isExplored(x, y)) {
-        if (tile == Tile.Wall)
-          this.drawSprite(1, x, y, Color.Grey);
-        else if (tile == Tile.ClosedDoor)
-          this.drawSprite(2, x, y, Color.Grey);
-        else if (tile == Tile.OpenDoor)
-          this.drawSprite(3, x, y, Color.Grey);
-        else
-          this.drawRect(x, y, "grey");
-      } else {
-        this.drawRect(x, y, "black");
-      }
-    }
-  }
-
   private drawRect(x: number, y: number, style: string): void {
     this.ctx!.fillStyle = style;
     this.ctx!.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
@@ -193,11 +208,11 @@ class Main {
     if (image) this.ctx!.drawImage(image, x, y, this.spriteWidth, this.spriteHeight);
   }
 
-  private drawSprite(index: number, x: number, y: number, foreground: Color): void {
-    this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground);
+  private drawSprite(index: number, x: number, y: number, foreground: Color, background: Color = Color.White): void {
+    this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground, background);
   }
 
-  private drawEntity(entity: AnimatedEntity): void {
+  private drawEntity(entity: GraphicsEntity): void {
     this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, Color.Transparent);
   }
 }

@@ -109,7 +109,7 @@ class ShadowCasting {
           const proj = Shadow.projectTile(row, col);
           const visible = !line.isInShadow(proj);
           this.map.setVisible(posX, posY, visible);
-          if (visible && this.map.isBlocked(posX, posY)) {
+          if (visible && this.map.blocksView(posX, posY)) {
             line.add(proj);
             fullShadow = line.isFullShadow();
           }

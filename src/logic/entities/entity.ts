@@ -2,7 +2,7 @@ import Action from "../actions/action";
 import Actor from "../actor";
 import Game from "../game";
 
-abstract class Entity {
+abstract class Entity implements Actor {
   x: number;
   y: number;
 
@@ -39,6 +39,13 @@ abstract class Entity {
       return true;
     } else return false;
   }
+
+  move(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+  }
+
+  bump(x: number, y: number): void { }
 
   abstract isPlayer(): boolean;
   abstract decideNextAction(game: Game): void;

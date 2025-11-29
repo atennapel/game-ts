@@ -28,6 +28,10 @@ class Map {
     return Tile.isBlocked(this.map[x][y]);
   }
 
+  blocksView(x: number, y: number): boolean {
+    return Tile.blocksView(this.map[x][y]);
+  }
+
   isVisible(x: number, y: number): boolean {
     return this.visible[x][y];
   }
