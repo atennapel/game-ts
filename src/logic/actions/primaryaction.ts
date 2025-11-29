@@ -7,6 +7,7 @@ import BumpAction from "./bumpaction";
 import MoveAction from "./moveaction";
 import OpenDoorAction from "./opendooraction";
 import StepAction from "./stepaction";
+import UseAction from "./UseAction";
 
 class PrimaryAction extends Action {
   readonly position: Pos;
@@ -31,6 +32,17 @@ class PrimaryAction extends Action {
         const actions = path.map(p => new StepAction(p));
         actions.push(new OpenDoorAction(last));
         actions.push(new StepAction(last));
+        return actions;
+      }
+      return null;
+    } else if (tile == Tile.Computer) {
+      map.set(gx, gy, Tile.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop()!;
+        const actions = path.map(p => new StepAction(p));
+        actions.push(new UseAction(last));
         return actions;
       }
       return null;

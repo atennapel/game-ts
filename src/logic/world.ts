@@ -1,16 +1,17 @@
 import Entity from "./entities/entity";
 import NPC from "./entities/npc";
 import Player from "./entities/player";
-import Map from "./map";
+import M from "./map";
 import Tile from "./tile";
 
 class World {
-  readonly map: Map;
+  readonly map: M;
   readonly player: Player;
   readonly entities: Entity[] = [];
+  private readonly signals: Map<number, boolean> = new Map();
 
   constructor(width: number, height: number) {
-    this.map = new Map(width, height);
+    this.map = new M(width, height);
     this.player = new Player(1, 1);
 
     this.entities.push(this.player);
@@ -34,6 +35,19 @@ class World {
     this.map.set(8, 9, Tile.Table);
     this.map.set(9, 9, Tile.Chair);
     this.map.set(9, 7, Tile.Computer);
+    this.map.set(7, 7, Tile.Lightbulb);
+  }
+
+  getSignal(ix: number): boolean {
+    return this.signals.get(ix) || false;
+  }
+
+  setSignal(ix: number, value: boolean): void {
+    this.signals.set(ix, value);
+  }
+
+  toggleSignal(ix: number): void {
+    this.signals.set(ix, !this.signals.get(ix));
   }
 }
 

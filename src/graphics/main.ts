@@ -144,9 +144,10 @@ class Main {
     const tileBackgroundCache: Color[] = [];
     const tileForegroundCache: Color[] = [];
     const index = this.tileCycleIndex;
+    const map = this.map;
+    const world = this.world;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        const map = this.map;
         const visible = map.isVisible(x, y);
         const tile = map.get(x, y);
         let sprite;
@@ -157,9 +158,9 @@ class Main {
           foreground = tileForegroundCache[tile];
         } else {
           const graphicstile = graphicsTiles[tile];
-          sprite = graphicstile.sprite(index);
-          background = graphicstile.color(index, true);
-          foreground = graphicstile.color(index, false);
+          sprite = graphicstile.sprite(world, index);
+          background = graphicstile.color(world, index, true);
+          foreground = graphicstile.color(world, index, false);
           tileSpriteCache[tile] = sprite;
           tileBackgroundCache[tile] = background;
           tileForegroundCache[tile] = foreground;

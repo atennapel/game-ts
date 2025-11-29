@@ -7,6 +7,7 @@ enum Tile {
   Chair,
   Table,
   Computer,
+  Lightbulb,
 }
 
 namespace Tile {
@@ -17,6 +18,7 @@ namespace Tile {
       case Tile.Fire: return true;
       case Tile.Table: return true;
       case Tile.Computer: return true;
+      case Tile.Lightbulb: return true;
       default: return false;
     }
   }
@@ -33,6 +35,7 @@ namespace Tile {
       case Tile.Chair: return "chair";
       case Tile.Table: return "table";
       case Tile.Computer: return "computer";
+      case Tile.Lightbulb: return "lightbulb";
       default: return null;
     }
   }

@@ -1,3 +1,4 @@
+import World from "../../logic/world";
 import Color from "../color";
 import GraphicsTile from "./graphicstile";
 
@@ -13,11 +14,11 @@ class StaticTile extends GraphicsTile {
     this.foreground = foreground;
   }
 
-  override sprite(index: number): number {
+  override sprite(world: World, index: number): number {
     return this.mySprite;
   }
 
-  override color(index: number, background: Boolean): Color {
+  override color(world: World, index: number, background: Boolean): Color {
     return background ? this.background : this.foreground;
   }
 }

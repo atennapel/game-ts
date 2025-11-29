@@ -1,8 +1,9 @@
+import World from "../../logic/world";
 import Color from "../color";
 
 abstract class GraphicsTile {
-  abstract sprite(index: number): number;
-  abstract color(index: number, background: boolean): Color;
+  abstract sprite(world: World, index: number): number;
+  abstract color(world: World, index: number, background: boolean): Color;
 }
 
 export default GraphicsTile;

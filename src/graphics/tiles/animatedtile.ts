@@ -1,3 +1,4 @@
+import World from "../../logic/world";
 import Color from "../color";
 import GraphicsTile from "./graphicstile";
 
@@ -17,11 +18,11 @@ class AnimatedTile extends GraphicsTile {
     this.colorAnimationSpeed = colorAnimationSpeed;
   }
 
-  override sprite(index: number): number {
+  override sprite(world: World, index: number): number {
     return this.sprites[Math.floor(index / this.spriteAnimationSpeed) % this.sprites.length];
   }
 
-  override color(index: number, background: boolean): Color {
+  override color(world: World, index: number, background: boolean): Color {
     const i = Math.floor(index / this.colorAnimationSpeed);
     return background ? this.background[i % this.background.length] : this.foreground[i % this.foreground.length];
   }

@@ -1,6 +1,7 @@
 import Color from "../color";
 import AnimatedTile from "./animatedtile";
 import GraphicsTile from "./graphicstile";
+import LightbulbTile from "./lightbulbtile";
 import StaticTile from "./statictile";
 
 const tiles: GraphicsTile[] = [
@@ -20,6 +21,8 @@ const tiles: GraphicsTile[] = [
   new StaticTile(8, Color.Transparent, Color.Brown),
   // Computer
   new AnimatedTile([9, 10], [Color.White], [Color.DarkGrey], 4, 4),
+  // Lightbulb
+  new LightbulbTile(0),
 ];
 
 export default tiles;

@@ -10,6 +10,7 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Chair"] = 5] = "Chair";
   Tile2[Tile2["Table"] = 6] = "Table";
   Tile2[Tile2["Computer"] = 7] = "Computer";
+  Tile2[Tile2["Lightbulb"] = 8] = "Lightbulb";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
@@ -24,6 +25,8 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
       case 6 /* Table */:
         return true;
       case 7 /* Computer */:
+        return true;
+      case 8 /* Lightbulb */:
         return true;
       default:
         return false;
@@ -48,6 +51,8 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
         return "table";
       case 7 /* Computer */:
         return "computer";
+      case 8 /* Lightbulb */:
+        return "lightbulb";
       default:
         return null;
     }
@@ -139,6 +144,26 @@ var OpenDoorAction = class extends action_default {
 };
 var opendooraction_default = OpenDoorAction;
 
+// src/logic/actions/UseAction.ts
+var UseAction = class extends action_default {
+  position;
+  constructor(position) {
+    super();
+    this.position = position;
+  }
+  tryPerform(game, actor) {
+    const x = this.position.x;
+    const y = this.position.y;
+    const map = game.world.map;
+    if (map.get(x, y) != tile_default.Computer)
+      return null;
+    actor.bump(x, y);
+    game.world.toggleSignal(0);
+    return null;
+  }
+};
+var UseAction_default = UseAction;
+
 // src/logic/actions/primaryaction.ts
 var PrimaryAction = class extends action_default {
   position;
@@ -160,6 +185,17 @@ var PrimaryAction = class extends action_default {
         const actions = path.map((p) => new stepaction_default(p));
         actions.push(new opendooraction_default(last));
         actions.push(new stepaction_default(last));
+        return actions;
+      }
+      return null;
+    } else if (tile == tile_default.Computer) {
+      map.set(gx, gy, tile_default.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new UseAction_default(last));
         return actions;
       }
       return null;
@@ -768,6 +804,7 @@ var World = class {
   map;
   player;
   entities = [];
+  signals = /* @__PURE__ */ new Map();
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
@@ -790,6 +827,16 @@ var World = class {
     this.map.set(8, 9, tile_default.Table);
     this.map.set(9, 9, tile_default.Chair);
     this.map.set(9, 7, tile_default.Computer);
+    this.map.set(7, 7, tile_default.Lightbulb);
+  }
+  getSignal(ix) {
+    return this.signals.get(ix) || false;
+  }
+  setSignal(ix, value) {
+    this.signals.set(ix, value);
+  }
+  toggleSignal(ix) {
+    this.signals.set(ix, !this.signals.get(ix));
   }
 };
 var world_default = World;
@@ -964,6 +1011,7 @@ var Color = class _Color {
   static Blue = new _Color(0, 255, 0, 255);
   static Green = new _Color(0, 0, 255, 255);
   static Brown = new _Color(150, 75, 0, 255);
+  static BrightYellow = new _Color(255, 234, 0, 255);
 };
 var color_default = Color;
 
@@ -1059,15 +1107,31 @@ var AnimatedTile = class extends graphicstile_default {
     this.spriteAnimationSpeed = spriteAnimationSpeed;
     this.colorAnimationSpeed = colorAnimationSpeed;
   }
-  sprite(index) {
+  sprite(world, index) {
     return this.sprites[Math.floor(index / this.spriteAnimationSpeed) % this.sprites.length];
   }
-  color(index, background) {
+  color(world, index, background) {
     const i = Math.floor(index / this.colorAnimationSpeed);
     return background ? this.background[i % this.background.length] : this.foreground[i % this.foreground.length];
   }
 };
 var animatedtile_default = AnimatedTile;
+
+// src/graphics/tiles/lightbulbtile.ts
+var LightbulbTile = class extends graphicstile_default {
+  signal;
+  constructor(signal) {
+    super();
+    this.signal = signal;
+  }
+  sprite(world, index) {
+    return 11;
+  }
+  color(world, index, background) {
+    return background ? color_default.Transparent : world.getSignal(this.signal) ? color_default.BrightYellow : color_default.DarkGrey;
+  }
+};
+var lightbulbtile_default = LightbulbTile;
 
 // src/graphics/tiles/statictile.ts
 var StaticTile = class extends graphicstile_default {
@@ -1080,10 +1144,10 @@ var StaticTile = class extends graphicstile_default {
     this.background = background;
     this.foreground = foreground;
   }
-  sprite(index) {
+  sprite(world, index) {
     return this.mySprite;
   }
-  color(index, background) {
+  color(world, index, background) {
     return background ? this.background : this.foreground;
   }
 };
@@ -1106,7 +1170,9 @@ var tiles = [
   // Table
   new statictile_default(8, color_default.Transparent, color_default.Brown),
   // Computer
-  new animatedtile_default([9, 10], [color_default.White], [color_default.DarkGrey], 4, 4)
+  new animatedtile_default([9, 10], [color_default.White], [color_default.DarkGrey], 4, 4),
+  // Lightbulb
+  new lightbulbtile_default(0)
 ];
 var graphicstiles_default = tiles;
 
@@ -1212,9 +1278,10 @@ var Main = class {
     const tileBackgroundCache = [];
     const tileForegroundCache = [];
     const index = this.tileCycleIndex;
+    const map = this.map;
+    const world = this.world;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        const map = this.map;
         const visible = map.isVisible(x, y);
         const tile = map.get(x, y);
         let sprite;
@@ -1225,9 +1292,9 @@ var Main = class {
           foreground = tileForegroundCache[tile];
         } else {
           const graphicstile = graphicstiles_default[tile];
-          sprite = graphicstile.sprite(index);
-          background = graphicstile.color(index, true);
-          foreground = graphicstile.color(index, false);
+          sprite = graphicstile.sprite(world, index);
+          background = graphicstile.color(world, index, true);
+          foreground = graphicstile.color(world, index, false);
           tileSpriteCache[tile] = sprite;
           tileBackgroundCache[tile] = background;
           tileForegroundCache[tile] = foreground;
