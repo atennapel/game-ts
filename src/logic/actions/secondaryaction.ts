@@ -6,6 +6,7 @@ import Action from "./action";
 import CloseDoorAction from "./closedooraction";
 import OpenDoorAction from "./opendooraction";
 import StepAction from "./stepaction";
+import WaitAction from "./waitaction";
 
 class SecondaryAction extends Action {
   readonly position: Pos;
@@ -18,6 +19,8 @@ class SecondaryAction extends Action {
   override tryPerform(game: Game, actor: Actor): Action[] | null {
     const gx = this.position.x;
     const gy = this.position.y;
+    if (gx == actor.x && gy == actor.y)
+      return [new WaitAction()];
     const map = game.world.map;
     const tile = map.get(gx, gy);
     if (tile == Tile.ClosedDoor) {

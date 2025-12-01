@@ -144,7 +144,7 @@ var OpenDoorAction = class extends action_default {
 };
 var opendooraction_default = OpenDoorAction;
 
-// src/logic/actions/UseAction.ts
+// src/logic/actions/useaction.ts
 var UseAction = class extends action_default {
   position;
   constructor(position) {
@@ -162,7 +162,7 @@ var UseAction = class extends action_default {
     return null;
   }
 };
-var UseAction_default = UseAction;
+var useaction_default = UseAction;
 
 // src/logic/actions/primaryaction.ts
 var PrimaryAction = class extends action_default {
@@ -195,7 +195,7 @@ var PrimaryAction = class extends action_default {
       if (path && path.length > 0) {
         const last = path.pop();
         const actions = path.map((p) => new stepaction_default(p));
-        actions.push(new UseAction_default(last));
+        actions.push(new useaction_default(last));
         return actions;
       }
       return null;
@@ -237,6 +237,14 @@ var CloseDoorAction = class extends action_default {
 };
 var closedooraction_default = CloseDoorAction;
 
+// src/logic/actions/waitaction.ts
+var WaitAction = class extends action_default {
+  tryPerform(game, actor) {
+    return null;
+  }
+};
+var waitaction_default = WaitAction;
+
 // src/logic/actions/secondaryaction.ts
 var SecondaryAction = class extends action_default {
   position;
@@ -247,6 +255,8 @@ var SecondaryAction = class extends action_default {
   tryPerform(game, actor) {
     const gx = this.position.x;
     const gy = this.position.y;
+    if (gx == actor.x && gy == actor.y)
+      return [new waitaction_default()];
     const map = game.world.map;
     const tile = map.get(gx, gy);
     if (tile == tile_default.ClosedDoor) {
@@ -873,7 +883,7 @@ var GraphicsEntity = class {
   goalY;
   spriteWidth;
   spriteHeight;
-  animating = false;
+  moving = false;
   bumping = false;
   animationSpeed = 0.25;
   bumpRatio = 0.25;
@@ -910,16 +920,13 @@ var GraphicsEntity = class {
   isPlayer() {
     return this.entity.isPlayer();
   }
-  isAnimating() {
-    return this.animating;
-  }
   move(x, y) {
-    this.animating = true;
+    this.moving = true;
     this.goalX = x * this.spriteWidth;
     this.goalY = y * this.spriteHeight;
   }
   bump(x, y) {
-    this.animating = true;
+    this.moving = true;
     this.bumping = true;
     const dx = x - this.entity.x;
     const dy = y - this.entity.y;
@@ -934,7 +941,7 @@ var GraphicsEntity = class {
       if (this.spriteIndex >= this.cycles)
         this.spriteIndex = 0;
     }
-    if (!this.animating && !this.entity.takeTurn(game, this)) return;
+    if (!this.moving && !this.entity.takeTurn(game, this)) return;
     let gx = this.goalX;
     let gy = this.goalY;
     let ax = this.absoluteX;
@@ -945,7 +952,7 @@ var GraphicsEntity = class {
         gx = this.entity.x * this.spriteWidth;
         gy = this.entity.y * this.spriteHeight;
       } else {
-        this.animating = false;
+        this.moving = false;
         this.entity.move(Math.floor(gx / this.spriteWidth), Math.floor(gy / this.spriteHeight));
         return;
       }

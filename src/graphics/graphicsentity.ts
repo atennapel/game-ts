@@ -15,7 +15,7 @@ class GraphicsEntity implements Actor {
   private spriteWidth: number;
   private spriteHeight: number;
 
-  private animating: boolean = false;
+  private moving: boolean = false;
   private bumping: boolean = false;
 
   animationSpeed: number = 0.25;
@@ -56,18 +56,14 @@ class GraphicsEntity implements Actor {
     return this.entity.isPlayer();
   }
 
-  isAnimating(): boolean {
-    return this.animating;
-  }
-
   move(x: number, y: number): void {
-    this.animating = true;
+    this.moving = true;
     this.goalX = x * this.spriteWidth;
     this.goalY = y * this.spriteHeight;
   }
 
   bump(x: number, y: number): void {
-    this.animating = true;
+    this.moving = true;
     this.bumping = true;
     const dx = x - this.entity.x;
     const dy = y - this.entity.y;
@@ -86,7 +82,7 @@ class GraphicsEntity implements Actor {
     }
 
     // let entity take turn if possible
-    if (!this.animating && !this.entity.takeTurn(game, this)) return;
+    if (!this.moving && !this.entity.takeTurn(game, this)) return;
 
     // animate movement
     let gx = this.goalX;
@@ -100,7 +96,7 @@ class GraphicsEntity implements Actor {
         gx = this.entity.x * this.spriteWidth;
         gy = this.entity.y * this.spriteHeight;
       } else {
-        this.animating = false;
+        this.moving = false;
         this.entity.move(Math.floor(gx / this.spriteWidth), Math.floor(gy / this.spriteHeight));
         return;
       }

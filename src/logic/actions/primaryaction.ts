@@ -7,7 +7,7 @@ import BumpAction from "./bumpaction";
 import MoveAction from "./moveaction";
 import OpenDoorAction from "./opendooraction";
 import StepAction from "./stepaction";
-import UseAction from "./UseAction";
+import UseAction from "./useaction";
 
 class PrimaryAction extends Action {
   readonly position: Pos;
