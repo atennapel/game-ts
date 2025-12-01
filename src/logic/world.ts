@@ -1,21 +1,21 @@
-import Entity from "./entities/entity";
-import NPC from "./entities/npc";
-import Player from "./entities/player";
+import Entity from "./actors/actor";
+import NPC from "./actors/npc";
+import Player from "./actors/player";
 import M from "./map";
 import Tile from "./tile";
 
 class World {
   readonly map: M;
   readonly player: Player;
-  readonly entities: Entity[] = [];
+  readonly actors: Entity[] = [];
   private readonly signals: Map<number, boolean> = new Map();
 
   constructor(width: number, height: number) {
     this.map = new M(width, height);
     this.player = new Player(1, 1);
 
-    this.entities.push(this.player);
-    this.entities.push(new NPC(2, 2));
+    this.actors.push(this.player);
+    this.actors.push(new NPC(2, 2));
 
     // initialize a map for testing
     for (let x = 0; x < width; x++) {

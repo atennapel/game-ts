@@ -5,11 +5,11 @@ import Map from "../logic/map";
 import Pos from "../logic/pos";
 import Tile from "../logic/tile";
 import World from "../logic/world";
-import GraphicsEntity from "./graphicsentity";
+import GraphicsActor from "./graphicsactor";
 import Color from "./color";
 import Sprites from "./sprites";
 import graphicsTiles from "./tiles/graphicstiles";
-import Entity from "../logic/entities/entity";
+import Entity from "../logic/actors/actor";
 
 class Main {
   private readonly width: number = 20;
@@ -21,8 +21,7 @@ class Main {
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
-  private entities: GraphicsEntity[] = this.world.entities.map(e => this.createGraphicsEntity(e));
-  private player: GraphicsEntity = this.entities.find(e => e.isPlayer())!;
+  private actors: GraphicsActor[] = this.world.actors.map(e => this.createGraphicsActor(e));
 
   private mx: number = 0;
   private my: number = 0;
@@ -41,10 +40,10 @@ class Main {
   private tileCycleSpeed: number = 64;
   private tileCycleMax: number = 60;
 
-  private createGraphicsEntity(entity: Entity): GraphicsEntity {
+  private createGraphicsActor(entity: Entity): GraphicsActor {
     if (entity.isPlayer())
-      return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Black]);
-    return new GraphicsEntity(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Red]);
+      return new GraphicsActor(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Black]);
+    return new GraphicsActor(entity, this.spriteWidth, this.spriteHeight, [1], [Color.Red]);
   }
 
   async initialize(
@@ -93,11 +92,11 @@ class Main {
     if (event.buttons == 4 || (event.ctrlKey && event.buttons == 1)) {
       this.gx = mx;
       this.gy = my;
-      this.player.setAction(new SecondaryAction(new Pos(mx, my)));
+      this.world.player.setAction(new SecondaryAction(new Pos(mx, my)));
     } else if (event.buttons == 1) {
       this.gx = mx;
       this.gy = my;
-      this.player.setAction(new PrimaryAction(new Pos(mx, my)));
+      this.world.player.setAction(new PrimaryAction(new Pos(mx, my)));
     }
   }
 
@@ -119,7 +118,16 @@ class Main {
   }
 
   private logic(delta: number): void {
-    // tile animations
+    // take a turn
+    if (!this.game.waitingOnAction()) {
+      const action = this.game.takeTurn();
+      if (action) {
+        const actor = this.actors[this.game.currentActorIndex()];
+        actor.startAction(this.game, action);
+      }
+    }
+
+    // update tile animations
     this.tileCycleAcc += delta;
     while (this.tileCycleAcc >= this.tileCycleSpeed) {
       this.tileCycleAcc -= this.tileCycleSpeed;
@@ -128,10 +136,10 @@ class Main {
         this.tileCycleIndex = 0;
     }
 
-    // entity update
-    const entities = this.entities;
-    for (let i = 0; i < entities.length; i++)
-      entities[i].update(this.game, delta);
+    // update actor animations
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++)
+      actors[i].updateAnimation(this.game, delta);
   }
 
   private draw(): void {
@@ -176,16 +184,16 @@ class Main {
       }
     }
 
-    // draw entities
-    const entities = this.entities;
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i];
-      if (entity.isPlayer() || this.map.isVisible(entity.x, entity.y))
-        this.drawEntity(entity);
+    // draw actors
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++) {
+      const actor = actors[i];
+      if (actor.isPlayer() || this.map.isVisible(actor.x, actor.y))
+        this.drawEntity(actor);
     }
 
     // draw goal
-    if (!this.player.isIdle())
+    if (!this.world.player.isIdle())
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
 
     // draw mouse indicator
@@ -216,6 +224,14 @@ class Main {
     this.ctx!.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
     this.ctx!.fillStyle = "black";
     this.ctx!.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+
+    // draw turns
+    const turnsText = `turns: ${this.game.turns} | ${this.game.playerTurns}`;
+    this.ctx!.font = "12px monospace"
+    this.ctx!.fillStyle = "white";
+    this.ctx!.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
+    this.ctx!.fillStyle = "black";
+    this.ctx!.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
   }
 
   private drawRect(x: number, y: number, style: string): void {
@@ -232,7 +248,7 @@ class Main {
     this.drawSpriteAbsolute(index, x * this.spriteWidth, y * this.spriteHeight, foreground, background);
   }
 
-  private drawEntity(entity: GraphicsEntity): void {
+  private drawEntity(entity: GraphicsActor): void {
     this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, Color.Transparent);
   }
 }

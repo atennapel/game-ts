@@ -1,4 +1,4 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 import Pos from "../pos";
 import Action from "./action";
@@ -11,16 +11,17 @@ class StepAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action[] | null {
+  override tryPerform(game: Game, actor: Actor): Action[] | boolean {
     const x = this.position.x;
     const y = this.position.y;
 
     if (game.world.map.isBlocked(x, y))
-      return null;
+      return false;
 
-    actor.move(x, y);
-    if (actor.isPlayer()) game.refreshVisibilityAt(x, y);
-    return null;
+    actor.x = x;
+    actor.y = y;
+    if (actor.isPlayer()) game.refreshVisibility();
+    return true;
   }
 }
 

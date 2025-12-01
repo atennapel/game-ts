@@ -1,4 +1,4 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 import Pos from "../pos";
 import Tile from "../tile";
@@ -12,16 +12,15 @@ class CloseDoorAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action[] | null {
+  override tryPerform(game: Game, actor: Actor): Action[] | boolean {
     const x = this.position.x;
     const y = this.position.y;
     const map = game.world.map;
     if (map.get(x, y) != Tile.OpenDoor)
-      return null;
-    actor.bump(x, y);
+      return false;
     map.set(x, y, Tile.ClosedDoor);
     game.refreshVisibility();
-    return null;
+    return true;
   }
 }
 

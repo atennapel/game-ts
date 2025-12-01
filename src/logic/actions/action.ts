@@ -1,17 +1,17 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 
 abstract class Action {
-  abstract tryPerform(game: Game, actor: Actor): Action[] | null;
+  readonly energyCost: number = 100;
 
-  perform(game: Game, actor: Actor): void {
-    let action: Action = this;
-    while (true) {
-      const result = action.tryPerform(game, actor);
-      if (!result || result.length == 0) break;
-      action = result.shift()!;
-      actor.addActions(result);
-    }
+  abstract tryPerform(game: Game, actor: Actor): Action[] | boolean;
+
+  perform(game: Game, actor: Actor): boolean {
+    const result = this.tryPerform(game, actor);
+    if (!Array.isArray(result)) return result;
+    if (result.length == 0) return false;
+    actor.addActions(result);
+    return false;
   }
 }
 

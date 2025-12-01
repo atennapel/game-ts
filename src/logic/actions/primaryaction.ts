@@ -1,4 +1,4 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 import Pos from "../pos";
 import Tile from "../tile";
@@ -17,7 +17,9 @@ class PrimaryAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action[] | null {
+  override energyCost: number = 0;
+
+  override tryPerform(game: Game, actor: Actor): Action[] | boolean {
     const gx = this.position.x;
     const gy = this.position.y;
 
@@ -34,7 +36,7 @@ class PrimaryAction extends Action {
         actions.push(new StepAction(last));
         return actions;
       }
-      return null;
+      return false;
     } else if (tile == Tile.Computer) {
       map.set(gx, gy, Tile.Empty);
       const path = game.findPath(actor.x, actor.y, gx, gy);
@@ -45,7 +47,7 @@ class PrimaryAction extends Action {
         actions.push(new UseAction(last));
         return actions;
       }
-      return null;
+      return false;
     } else if (Tile.isBlocked(tile)) {
       map.set(gx, gy, Tile.Empty);
       const path = game.findPath(actor.x, actor.y, gx, gy);
@@ -56,7 +58,7 @@ class PrimaryAction extends Action {
         actions.push(new BumpAction(last));
         return actions;
       }
-      return null;
+      return false;
     }
 
     return [new MoveAction(this.position)];

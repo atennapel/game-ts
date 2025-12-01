@@ -1,4 +1,4 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 import Pos from "../pos";
 import Tile from "../tile";
@@ -16,7 +16,9 @@ class SecondaryAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action[] | null {
+  override energyCost: number = 0;
+
+  override tryPerform(game: Game, actor: Actor): Action[] | boolean {
     const gx = this.position.x;
     const gy = this.position.y;
     if (gx == actor.x && gy == actor.y)
@@ -42,7 +44,7 @@ class SecondaryAction extends Action {
         return actions;
       }
     }
-    return null;
+    return false;
   }
 }
 

@@ -14,11 +14,11 @@ TODO:
 - [x] NPCs
 - [x] Improve tile management
 - [x] Improve entity management
-- [ ] Turn-based system
+- [x] Turn-based system with energy/speed
+- [ ] Move all monsters at once
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 
 Questions:
-- Should refresh visiblity be an action so that it can happen after the move animation, instead of straight away?
 - How to handle the different background colors and tiles? Should tiles be layered?
 
 ## References

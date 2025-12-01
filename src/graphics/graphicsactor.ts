@@ -1,11 +1,15 @@
 import Action from "../logic/actions/action";
-import Actor from "../logic/actor";
-import Entity from "../logic/entities/entity";
+import BumpAction from "../logic/actions/bumpaction";
+import CloseDoorAction from "../logic/actions/closedooraction";
+import OpenDoorAction from "../logic/actions/opendooraction";
+import StepAction from "../logic/actions/stepaction";
+import UseAction from "../logic/actions/useaction";
+import Actor from "../logic/actors/actor";
 import Game from "../logic/game";
 import Color from "./color";
 
-class GraphicsEntity implements Actor {
-  private entity: Entity;
+class GraphicsActor {
+  private actor: Actor;
 
   absoluteX: number;
   absoluteY: number;
@@ -28,10 +32,10 @@ class GraphicsEntity implements Actor {
   private spriteIndex: number = 0;
   private spriteCycleAcc: number = 0;
 
-  constructor(entity: Entity, spriteWidth: number, spriteHeight: number, sprites: number[], colors: Color[]) {
-    this.entity = entity;
-    this.absoluteX = entity.x * spriteWidth;
-    this.absoluteY = entity.y * spriteHeight;
+  constructor(actor: Actor, spriteWidth: number, spriteHeight: number, sprites: number[], colors: Color[]) {
+    this.actor = actor;
+    this.absoluteX = actor.x * spriteWidth;
+    this.absoluteY = actor.y * spriteHeight;
     this.goalX = this.absoluteX;
     this.goalY = this.absoluteY;
     this.spriteWidth = spriteWidth;
@@ -41,8 +45,8 @@ class GraphicsEntity implements Actor {
     this.cycles = Math.max(sprites.length, colors.length);
   }
 
-  get x(): number { return this.entity.x }
-  get y(): number { return this.entity.y }
+  get x(): number { return this.actor.x }
+  get y(): number { return this.actor.y }
 
   get sprite(): number {
     return this.sprites[this.spriteIndex % this.sprites.length];
@@ -53,7 +57,7 @@ class GraphicsEntity implements Actor {
   }
 
   isPlayer(): boolean {
-    return this.entity.isPlayer();
+    return this.actor.isPlayer();
   }
 
   move(x: number, y: number): void {
@@ -65,13 +69,28 @@ class GraphicsEntity implements Actor {
   bump(x: number, y: number): void {
     this.moving = true;
     this.bumping = true;
-    const dx = x - this.entity.x;
-    const dy = y - this.entity.y;
+    const dx = x - this.actor.x;
+    const dy = y - this.actor.y;
     this.goalX = this.absoluteX + dx * this.spriteWidth * this.bumpRatio;
     this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
   }
 
-  update(game: Game, delta: number): void {
+  startAction(game: Game, action: Action): void {
+    if (this.moving) return;
+    if (action instanceof BumpAction)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof CloseDoorAction)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof OpenDoorAction)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof UseAction)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof StepAction)
+      this.move(action.position.x, action.position.y);
+    else game.performAction();
+  }
+
+  updateAnimation(game: Game, delta: number): void {
     // animate sprite/color
     this.spriteCycleAcc += delta;
     while (this.spriteCycleAcc >= this.spriteCycleSpeed) {
@@ -81,8 +100,7 @@ class GraphicsEntity implements Actor {
         this.spriteIndex = 0;
     }
 
-    // let entity take turn if possible
-    if (!this.moving && !this.entity.takeTurn(game, this)) return;
+    if (!this.moving) return;
 
     // animate movement
     let gx = this.goalX;
@@ -93,11 +111,11 @@ class GraphicsEntity implements Actor {
     if (gx == ax && gy == ay) {
       if (this.bumping) {
         this.bumping = false;
-        gx = this.entity.x * this.spriteWidth;
-        gy = this.entity.y * this.spriteHeight;
+        gx = this.actor.x * this.spriteWidth;
+        gy = this.actor.y * this.spriteHeight;
       } else {
         this.moving = false;
-        this.entity.move(Math.floor(gx / this.spriteWidth), Math.floor(gy / this.spriteHeight));
+        game.performAction();
         return;
       }
     }
@@ -125,22 +143,6 @@ class GraphicsEntity implements Actor {
     this.absoluteX = ax;
     this.absoluteY = ay;
   }
-
-  resetActions(): void {
-    this.entity.resetActions();
-  }
-
-  addActions(actions: Action[]): void {
-    this.entity.addActions(actions);
-  }
-
-  setAction(action: Action): void {
-    this.entity.setAction(action);
-  }
-
-  isIdle(): boolean {
-    return this.entity.isIdle();
-  }
 }
 
-export default GraphicsEntity;
+export default GraphicsActor;

@@ -1,4 +1,4 @@
-import Actor from "../actor";
+import Actor from "../actors/actor";
 import Game from "../game";
 import Pos from "../pos";
 import Action from "./action";
@@ -11,9 +11,8 @@ class BumpAction extends Action {
     this.position = position;
   }
 
-  override tryPerform(game: Game, actor: Actor): Action[] | null {
-    actor.bump(this.position.x, this.position.y);
-    return null;
+  override tryPerform(game: Game, actor: Actor): Action[] | boolean {
+    return true;
   }
 }
 
