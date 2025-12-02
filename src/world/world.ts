@@ -16,6 +16,7 @@ class World {
 
     this.actors.push(this.player);
     this.actors.push(new NPC(2, 2));
+    this.actors.push(new NPC(3, 3));
 
     // initialize a map for testing
     for (let x = 0; x < width; x++) {

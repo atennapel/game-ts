@@ -1,5 +1,5 @@
 import Actor from "../actors/actor";
-import Game from "../game";
+import Game from "../../logic/game";
 
 abstract class Action {
   readonly energyCost: number = 100;

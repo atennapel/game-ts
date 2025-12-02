@@ -15,7 +15,8 @@ TODO:
 - [x] Improve tile management
 - [x] Improve entity management
 - [x] Turn-based system with energy/speed
-- [ ] Move all monsters at once
+- [ ] Perform all animations at once
+- [ ] Try to split data from logic more
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 
 Questions:

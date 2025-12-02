@@ -1,5 +1,5 @@
 import Actor from "../actors/actor";
-import Game from "../game";
+import Game from "../../logic/game";
 import Action from "./action";
 
 class WaitAction extends Action {

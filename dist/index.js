@@ -1,6 +1,6 @@
 "use strict";
 
-// src/logic/tile.ts
+// src/world/tile.ts
 var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Empty"] = 0] = "Empty";
   Tile2[Tile2["Wall"] = 1] = "Wall";
@@ -61,7 +61,7 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
 })(Tile || (Tile = {}));
 var tile_default = Tile;
 
-// src/logic/actions/action.ts
+// src/world/actions/action.ts
 var Action = class {
   energyCost = 100;
   perform(game, actor) {
@@ -74,7 +74,7 @@ var Action = class {
 };
 var action_default = Action;
 
-// src/logic/actions/bumpaction.ts
+// src/world/actions/bumpaction.ts
 var BumpAction = class extends action_default {
   position;
   constructor(position) {
@@ -87,7 +87,7 @@ var BumpAction = class extends action_default {
 };
 var bumpaction_default = BumpAction;
 
-// src/logic/actions/stepaction.ts
+// src/world/actions/stepaction.ts
 var StepAction = class extends action_default {
   position;
   constructor(position) {
@@ -107,7 +107,7 @@ var StepAction = class extends action_default {
 };
 var stepaction_default = StepAction;
 
-// src/logic/actions/moveaction.ts
+// src/world/actions/moveaction.ts
 var MoveAction = class extends action_default {
   position;
   constructor(position) {
@@ -124,7 +124,7 @@ var MoveAction = class extends action_default {
 };
 var moveaction_default = MoveAction;
 
-// src/logic/actions/opendooraction.ts
+// src/world/actions/opendooraction.ts
 var OpenDoorAction = class extends action_default {
   position;
   constructor(position) {
@@ -144,7 +144,7 @@ var OpenDoorAction = class extends action_default {
 };
 var opendooraction_default = OpenDoorAction;
 
-// src/logic/actions/useaction.ts
+// src/world/actions/useaction.ts
 var UseAction = class extends action_default {
   position;
   constructor(position) {
@@ -163,7 +163,7 @@ var UseAction = class extends action_default {
 };
 var useaction_default = UseAction;
 
-// src/logic/actions/primaryaction.ts
+// src/world/actions/primaryaction.ts
 var PrimaryAction = class extends action_default {
   position;
   constructor(position) {
@@ -216,7 +216,7 @@ var PrimaryAction = class extends action_default {
 };
 var primaryaction_default = PrimaryAction;
 
-// src/logic/actions/closedooraction.ts
+// src/world/actions/closedooraction.ts
 var CloseDoorAction = class extends action_default {
   position;
   constructor(position) {
@@ -236,7 +236,7 @@ var CloseDoorAction = class extends action_default {
 };
 var closedooraction_default = CloseDoorAction;
 
-// src/logic/actions/waitaction.ts
+// src/world/actions/waitaction.ts
 var WaitAction = class extends action_default {
   energyCost = 0;
   tryPerform(game, actor) {
@@ -245,7 +245,7 @@ var WaitAction = class extends action_default {
 };
 var waitaction_default = WaitAction;
 
-// src/logic/actions/secondaryaction.ts
+// src/world/actions/secondaryaction.ts
 var SecondaryAction = class extends action_default {
   position;
   constructor(position) {
@@ -284,7 +284,7 @@ var SecondaryAction = class extends action_default {
 };
 var secondaryaction_default = SecondaryAction;
 
-// src/logic/pos.ts
+// src/world/pos.ts
 var Pos = class {
   x;
   y;
@@ -682,7 +682,7 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
-// src/logic/actors/actor.ts
+// src/world/actors/actor.ts
 var Actor = class {
   x;
   y;
@@ -724,7 +724,7 @@ var Actor = class {
 };
 var actor_default = Actor;
 
-// src/logic/actors/npc.ts
+// src/world/actors/npc.ts
 var NPC = class extends actor_default {
   constructor(x, y) {
     super(x, y);
@@ -744,7 +744,7 @@ var NPC = class extends actor_default {
 };
 var npc_default = NPC;
 
-// src/logic/actors/player.ts
+// src/world/actors/player.ts
 var Player = class extends actor_default {
   constructor(x, y) {
     super(x, y);
@@ -759,20 +759,8 @@ var Player = class extends actor_default {
 };
 var player_default = Player;
 
-// src/util.ts
-function array2d(width, height, value) {
-  const result = new Array(width);
-  for (let x = 0; x < width; x++) {
-    const inner = new Array(height);
-    for (let y = 0; y < height; y++)
-      inner[y] = value;
-    result[x] = inner;
-  }
-  return result;
-}
-
-// src/logic/map.ts
-var Map2 = class {
+// src/world/map.ts
+var Map2 = class _Map {
   width;
   height;
   map;
@@ -781,9 +769,19 @@ var Map2 = class {
   constructor(width, height) {
     this.width = width;
     this.height = height;
-    this.map = array2d(width, height, tile_default.Empty);
-    this.visible = array2d(width, height, false);
-    this.explored = array2d(width, height, false);
+    this.map = _Map.array2d(width, height, tile_default.Empty);
+    this.visible = _Map.array2d(width, height, false);
+    this.explored = _Map.array2d(width, height, false);
+  }
+  static array2d(width, height, value) {
+    const result = new Array(width);
+    for (let x = 0; x < width; x++) {
+      const inner = new Array(height);
+      for (let y = 0; y < height; y++)
+        inner[y] = value;
+      result[x] = inner;
+    }
+    return result;
   }
   set(x, y, tile) {
     this.map[x][y] = tile;
@@ -823,7 +821,7 @@ var Map2 = class {
 };
 var map_default = Map2;
 
-// src/logic/world.ts
+// src/world/world.ts
 var World = class {
   map;
   player;
@@ -834,6 +832,7 @@ var World = class {
     this.player = new player_default(1, 1);
     this.actors.push(this.player);
     this.actors.push(new npc_default(2, 2));
+    this.actors.push(new npc_default(3, 3));
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x == 0 || x == width - 1 || y == 0 || y == height - 1)

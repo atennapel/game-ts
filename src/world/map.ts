@@ -1,5 +1,4 @@
 import Tile from "./tile";
-import { array2d } from "../util";
 
 class Map {
   readonly width: number;
@@ -11,9 +10,20 @@ class Map {
   constructor(width: number, height: number) {
     this.width = width;
     this.height = height;
-    this.map = array2d(width, height, Tile.Empty);
-    this.visible = array2d(width, height, false);
-    this.explored = array2d(width, height, false);
+    this.map = Map.array2d(width, height, Tile.Empty);
+    this.visible = Map.array2d(width, height, false);
+    this.explored = Map.array2d(width, height, false);
+  }
+
+  private static array2d<A>(width: number, height: number, value: A): A[][] {
+    const result: A[][] = new Array(width);
+    for (let x = 0; x < width; x++) {
+      const inner: A[] = new Array(height);
+      for (let y = 0; y < height; y++)
+        inner[y] = value;
+      result[x] = inner;
+    }
+    return result;
   }
 
   set(x: number, y: number, tile: Tile): void {

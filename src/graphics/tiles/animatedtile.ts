@@ -1,4 +1,4 @@
-import World from "../../logic/world";
+import World from "../../world/world";
 import Color from "../color";
 import GraphicsTile from "./graphicstile";
 

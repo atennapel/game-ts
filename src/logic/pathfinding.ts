@@ -1,5 +1,5 @@
-import M from "./map";
-import Pos from "./pos";
+import M from "../world/map";
+import Pos from "../world/pos";
 import PriorityQueue from './priorityqueue';
 
 // Adaptation of https://www.redblobgames.com/pathfinding/a-star/implementation.html#algorithm

@@ -1,4 +1,4 @@
-import Game from "../game";
+import Game from "../../logic/game";
 import Entity from "./actor";
 
 class Player extends Entity {

@@ -1,10 +1,10 @@
 import Actor from "../actors/actor";
-import Game from "../game";
+import Game from "../../logic/game";
 import Pos from "../pos";
 import Tile from "../tile";
 import Action from "./action";
 
-class CloseDoorAction extends Action {
+class OpenDoorAction extends Action {
   readonly position: Pos;
 
   constructor(position: Pos) {
@@ -16,12 +16,12 @@ class CloseDoorAction extends Action {
     const x = this.position.x;
     const y = this.position.y;
     const map = game.world.map;
-    if (map.get(x, y) != Tile.OpenDoor)
+    if (map.get(x, y) != Tile.ClosedDoor)
       return false;
-    map.set(x, y, Tile.ClosedDoor);
+    map.set(x, y, Tile.OpenDoor);
     game.refreshVisibility();
     return true;
   }
 }
 
-export default CloseDoorAction;
+export default OpenDoorAction;

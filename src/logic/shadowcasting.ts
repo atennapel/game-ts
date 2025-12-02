@@ -1,5 +1,5 @@
-import Map from "./map";
-import Pos from "./pos";
+import Map from "../world/map";
+import Pos from "../world/pos";
 
 // Adaptation of https://journal.stuffwithstuff.com/2015/09/07/what-the-hero-sees/
 type Octant = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;

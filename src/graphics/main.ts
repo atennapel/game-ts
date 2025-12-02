@@ -1,15 +1,15 @@
-import PrimaryAction from "../logic/actions/primaryaction";
-import SecondaryAction from "../logic/actions/secondaryaction";
+import PrimaryAction from "../world/actions/primaryaction";
+import SecondaryAction from "../world/actions/secondaryaction";
 import Game from "../logic/game";
-import Map from "../logic/map";
-import Pos from "../logic/pos";
-import Tile from "../logic/tile";
-import World from "../logic/world";
+import Map from "../world/map";
+import Pos from "../world/pos";
+import Tile from "../world/tile";
+import World from "../world/world";
 import GraphicsActor from "./graphicsactor";
 import Color from "./color";
 import Sprites from "./sprites";
 import graphicsTiles from "./tiles/graphicstiles";
-import Entity from "../logic/actors/actor";
+import Entity from "../world/actors/actor";
 
 class Main {
   private readonly width: number = 20;

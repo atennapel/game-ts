@@ -1,5 +1,5 @@
 import PrimaryAction from "../actions/primaryaction";
-import Game from "../game";
+import Game from "../../logic/game";
 import Pos from "../pos";
 import Entity from "./actor";
 

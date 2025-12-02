@@ -1,8 +1,8 @@
-import Action from "./actions/action";
+import Action from "../world/actions/action";
 import PathFinding from "./pathfinding";
-import Pos from "./pos";
+import Pos from "../world/pos";
 import ShadowCasting from "./shadowcasting";
-import World from "./world";
+import World from "../world/world";
 
 class Game {
   readonly world: World;

@@ -1,10 +1,10 @@
-import Action from "../logic/actions/action";
-import BumpAction from "../logic/actions/bumpaction";
-import CloseDoorAction from "../logic/actions/closedooraction";
-import OpenDoorAction from "../logic/actions/opendooraction";
-import StepAction from "../logic/actions/stepaction";
-import UseAction from "../logic/actions/useaction";
-import Actor from "../logic/actors/actor";
+import Action from "../world/actions/action";
+import BumpAction from "../world/actions/bumpaction";
+import CloseDoorAction from "../world/actions/closedooraction";
+import OpenDoorAction from "../world/actions/opendooraction";
+import StepAction from "../world/actions/stepaction";
+import UseAction from "../world/actions/useaction";
+import Actor from "../world/actors/actor";
 import Game from "../logic/game";
 import Color from "./color";
 

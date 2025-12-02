@@ -1,5 +1,5 @@
 import Action from "../actions/action";
-import Game from "../game";
+import Game from "../../logic/game";
 
 abstract class Actor {
   x: number;
