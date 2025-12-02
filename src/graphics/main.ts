@@ -10,6 +10,7 @@ import Color from "./color";
 import Sprites from "./sprites";
 import graphicsTiles from "./tiles/graphicstiles";
 import Entity from "../world/actors/actor";
+import Action from "../world/actions/action";
 
 class Main {
   private readonly width: number = 20;
@@ -39,6 +40,9 @@ class Main {
   private tileCycleAcc: number = 0;
   private tileCycleSpeed: number = 64;
   private tileCycleMax: number = 60;
+
+  private waitingOnAnimations: boolean = false;
+  private pendingAnimations: { actor: GraphicsActor, action: Action }[] = [];
 
   private createGraphicsActor(entity: Entity): GraphicsActor {
     if (entity.isPlayer())
@@ -117,13 +121,39 @@ class Main {
     requestAnimationFrame(time => this.loop(time));
   }
 
+  private startPendingAnimations(): void {
+    const pendingAnimations = this.pendingAnimations;
+    const nextPendingAnimations: { actor: GraphicsActor, action: Action }[] = [];
+    for (let i = 0; i < pendingAnimations.length; i++) {
+      const animation = pendingAnimations[i];
+      if (animation.actor.isMoving())
+        nextPendingAnimations.push(animation);
+      else
+        animation.actor.animate(animation.action);
+    }
+    this.pendingAnimations = nextPendingAnimations;
+  }
+
   private logic(delta: number): void {
     // take a turn
-    if (!this.game.waitingOnAction()) {
-      const action = this.game.takeTurn();
-      if (action) {
-        const actor = this.actors[this.game.currentActorIndex()];
-        actor.startAction(this.game, action);
+    if (this.waitingOnAnimations) {
+      this.startPendingAnimations();
+      let allDone = true;
+      for (let i = 0; i < this.actors.length; i++) {
+        if (this.actors[i].isMoving()) {
+          allDone = false;
+          break;
+        }
+      }
+      if (this.pendingAnimations.length == 0 && allDone)
+        this.waitingOnAnimations = false;
+    } else {
+      const result = this.game.takeTurn();
+      if (result) {
+        const { action, actorIndex } = result;
+        const actor = this.actors[actorIndex];
+        this.pendingAnimations.push({ actor, action });
+        if (actor.isPlayer()) this.waitingOnAnimations = true;
       }
     }
 
@@ -139,7 +169,7 @@ class Main {
     // update actor animations
     const actors = this.actors;
     for (let i = 0; i < actors.length; i++)
-      actors[i].updateAnimation(this.game, delta);
+      actors[i].updateAnimation(delta);
   }
 
   private draw(): void {
@@ -232,6 +262,15 @@ class Main {
     this.ctx!.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
     this.ctx!.fillStyle = "black";
     this.ctx!.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
+
+    // debug
+    const debugText = `debug: ${this.pendingAnimations.length}`;
+    this.ctx!.font = "12px monospace"
+    this.ctx!.fillStyle = "white";
+    this.ctx!.fillRect(this.width * this.spriteWidth - 400, 0, 100, 16);
+    this.ctx!.fillStyle = "black";
+    this.ctx!.fillText(debugText, this.width * this.spriteWidth - 400 + 5, 10);
+
   }
 
   private drawRect(x: number, y: number, style: string): void {

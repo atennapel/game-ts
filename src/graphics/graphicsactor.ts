@@ -60,6 +60,10 @@ class GraphicsActor {
     return this.actor.isPlayer();
   }
 
+  isMoving(): boolean {
+    return this.moving;
+  }
+
   move(x: number, y: number): void {
     this.moving = true;
     this.goalX = x * this.spriteWidth;
@@ -75,8 +79,7 @@ class GraphicsActor {
     this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
   }
 
-  startAction(game: Game, action: Action): void {
-    if (this.moving) return;
+  animate(action: Action): void {
     if (action instanceof BumpAction)
       this.bump(action.position.x, action.position.y);
     else if (action instanceof CloseDoorAction)
@@ -87,10 +90,9 @@ class GraphicsActor {
       this.bump(action.position.x, action.position.y);
     else if (action instanceof StepAction)
       this.move(action.position.x, action.position.y);
-    else game.performAction();
   }
 
-  updateAnimation(game: Game, delta: number): void {
+  updateAnimation(delta: number): void {
     // animate sprite/color
     this.spriteCycleAcc += delta;
     while (this.spriteCycleAcc >= this.spriteCycleSpeed) {
@@ -115,7 +117,6 @@ class GraphicsActor {
         gy = this.actor.y * this.spriteHeight;
       } else {
         this.moving = false;
-        game.performAction();
         return;
       }
     }

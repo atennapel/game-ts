@@ -3,6 +3,7 @@ import PathFinding from "./pathfinding";
 import Pos from "../world/pos";
 import ShadowCasting from "./shadowcasting";
 import World from "../world/world";
+import Actor from "../world/actors/actor";
 
 class Game {
   readonly world: World;
@@ -10,7 +11,6 @@ class Game {
   private readonly shadowcasting: ShadowCasting;
 
   private actorIndex: number = 0;
-  private currentAction: Action | null = null;
 
   turns: number = 0;
   playerTurns: number = 0;
@@ -34,16 +34,11 @@ class Game {
     return this.actorIndex;
   }
 
-  waitingOnAction(): boolean {
-    return !!this.currentAction;
-  }
-
   private advanceActor() {
     this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 
-  takeTurn(): Action | null {
-    if (this.currentAction) return this.currentAction;
+  takeTurn(): { action: Action, actorIndex: number } | null {
     const actors = this.world.actors;
     if (actors.length == 0) return null;
     const actorIndex = this.actorIndex;
@@ -53,22 +48,19 @@ class Game {
       if (!action) {
         if (actor.isPlayer()) return null; // wait for input from player
         this.advanceActor();
+        return null;
+      } else {
+        this.performAction(actor, action);
+        return { action, actorIndex };
       }
-      this.currentAction = action;
-      return action;
     } else {
       this.advanceActor();
       return null;
     }
   }
 
-  performAction(): void {
-    const action = this.currentAction;
-    if (!action) return;
-    const actors = this.world.actors;
-    const actor = actors[this.actorIndex];
+  private performAction(actor: Actor, action: Action): void {
     const succeeded = action.perform(this, actor);
-    this.currentAction = null;
     if (succeeded) {
       actor.useEnergy(action.energyCost);
       this.advanceActor();

@@ -15,7 +15,7 @@ TODO:
 - [x] Improve tile management
 - [x] Improve entity management
 - [x] Turn-based system with energy/speed
-- [ ] Perform all animations at once
+- [x] Perform all animations at once
 - [ ] Try to split data from logic more
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 
