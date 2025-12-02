@@ -1,4 +1,4 @@
-import Entity from "./actors/actor";
+import Actor from "./actors/actor";
 import NPC from "./actors/npc";
 import Player from "./actors/player";
 import M from "./map";
@@ -7,7 +7,7 @@ import Tile from "./tile";
 class World {
   readonly map: M;
   readonly player: Player;
-  readonly actors: Entity[] = [];
+  readonly actors: Actor[] = [];
   private readonly signals: Map<number, boolean> = new Map();
 
   constructor(width: number, height: number) {
@@ -49,6 +49,16 @@ class World {
 
   toggleSignal(ix: number): void {
     this.signals.set(ix, !this.signals.get(ix));
+  }
+
+  actorAt(x: number, y: number): Actor | null {
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++) {
+      const actor = actors[i];
+      if (actor.x == x && actor.y == y)
+        return actor;
+    }
+    return null;
   }
 }
 

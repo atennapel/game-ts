@@ -50,7 +50,8 @@ class Game {
         this.advanceActor();
         return null;
       } else {
-        this.performAction(actor, action);
+        const succeeded = this.performAction(actor, action);
+        if (!succeeded) return null;
         return { action, actorIndex };
       }
     } else {
@@ -59,7 +60,7 @@ class Game {
     }
   }
 
-  private performAction(actor: Actor, action: Action): void {
+  private performAction(actor: Actor, action: Action): boolean {
     const succeeded = action.perform(this, actor);
     if (succeeded) {
       actor.useEnergy(action.energyCost);
@@ -67,6 +68,7 @@ class Game {
       this.turns++;
       if (actor.isPlayer()) this.playerTurns++;
     }
+    return succeeded;
   }
 }
 

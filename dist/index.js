@@ -99,6 +99,8 @@ var StepAction = class extends action_default {
     const y = this.position.y;
     if (game.world.map.isBlocked(x, y))
       return false;
+    if (game.world.actorAt(x, y))
+      return false;
     actor.x = x;
     actor.y = y;
     if (actor.isPlayer()) game.refreshVisibility();
@@ -163,6 +165,25 @@ var UseAction = class extends action_default {
 };
 var useaction_default = UseAction;
 
+// src/world/actions/attackaction.ts
+var AttackAction = class extends action_default {
+  position;
+  target;
+  constructor(position, target) {
+    super();
+    this.position = position;
+    this.target = target;
+  }
+  tryPerform(game, actor) {
+    const x = this.position.x;
+    const y = this.position.y;
+    const target = game.world.actorAt(x, y);
+    if (!target || this.target != target) return false;
+    return true;
+  }
+};
+var attackaction_default = AttackAction;
+
 // src/world/actions/primaryaction.ts
 var PrimaryAction = class extends action_default {
   position;
@@ -207,6 +228,17 @@ var PrimaryAction = class extends action_default {
         const last = path.pop();
         const actions = path.map((p) => new stepaction_default(p));
         actions.push(new bumpaction_default(last));
+        return actions;
+      }
+      return false;
+    }
+    const target = game.world.actorAt(gx, gy);
+    if (target) {
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p));
+        actions.push(new attackaction_default(last, target));
         return actions;
       }
       return false;
@@ -861,6 +893,15 @@ var World = class {
   toggleSignal(ix) {
     this.signals.set(ix, !this.signals.get(ix));
   }
+  actorAt(x, y) {
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++) {
+      const actor = actors[i];
+      if (actor.x == x && actor.y == y)
+        return actor;
+    }
+    return null;
+  }
 };
 var world_default = World;
 
@@ -902,7 +943,8 @@ var Game = class {
         this.advanceActor();
         return null;
       } else {
-        this.performAction(actor, action);
+        const succeeded = this.performAction(actor, action);
+        if (!succeeded) return null;
         return { action, actorIndex };
       }
     } else {
@@ -918,6 +960,7 @@ var Game = class {
       this.turns++;
       if (actor.isPlayer()) this.playerTurns++;
     }
+    return succeeded;
   }
 };
 var game_default = Game;
@@ -992,6 +1035,8 @@ var GraphicsActor = class {
     else if (action instanceof opendooraction_default)
       this.bump(action.position.x, action.position.y);
     else if (action instanceof useaction_default)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof attackaction_default)
       this.bump(action.position.x, action.position.y);
     else if (action instanceof stepaction_default)
       this.move(action.position.x, action.position.y);
@@ -1329,17 +1374,19 @@ var Main = class {
     }
     this.pendingAnimations = nextPendingAnimations;
   }
+  anyActorsMoving() {
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++) {
+      if (actors[i].isMoving()) {
+        return true;
+      }
+    }
+    return false;
+  }
   logic(delta) {
     if (this.waitingOnAnimations) {
       this.startPendingAnimations();
-      let allDone = true;
-      for (let i = 0; i < this.actors.length; i++) {
-        if (this.actors[i].isMoving()) {
-          allDone = false;
-          break;
-        }
-      }
-      if (this.pendingAnimations.length == 0 && allDone)
+      if (this.pendingAnimations.length == 0 && !this.anyActorsMoving())
         this.waitingOnAnimations = false;
     } else {
       const result = this.game.takeTurn();

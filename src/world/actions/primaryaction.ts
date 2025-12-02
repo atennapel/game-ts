@@ -8,6 +8,7 @@ import MoveAction from "./moveaction";
 import OpenDoorAction from "./opendooraction";
 import StepAction from "./stepaction";
 import UseAction from "./useaction";
+import AttackAction from "./attackaction";
 
 class PrimaryAction extends Action {
   readonly position: Pos;
@@ -56,6 +57,18 @@ class PrimaryAction extends Action {
         const last = path.pop()!;
         const actions = path.map(p => new StepAction(p));
         actions.push(new BumpAction(last));
+        return actions;
+      }
+      return false;
+    }
+
+    const target = game.world.actorAt(gx, gy);
+    if (target) {
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      if (path && path.length > 0) {
+        const last = path.pop()!;
+        const actions = path.map(p => new StepAction(p));
+        actions.push(new AttackAction(last, target));
         return actions;
       }
       return false;

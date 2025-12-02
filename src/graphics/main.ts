@@ -134,18 +134,21 @@ class Main {
     this.pendingAnimations = nextPendingAnimations;
   }
 
+  private anyActorsMoving(): boolean {
+    const actors = this.actors;
+    for (let i = 0; i < actors.length; i++) {
+      if (actors[i].isMoving()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private logic(delta: number): void {
     // take a turn
     if (this.waitingOnAnimations) {
       this.startPendingAnimations();
-      let allDone = true;
-      for (let i = 0; i < this.actors.length; i++) {
-        if (this.actors[i].isMoving()) {
-          allDone = false;
-          break;
-        }
-      }
-      if (this.pendingAnimations.length == 0 && allDone)
+      if (this.pendingAnimations.length == 0 && !this.anyActorsMoving())
         this.waitingOnAnimations = false;
     } else {
       const result = this.game.takeTurn();

@@ -7,6 +7,7 @@ import UseAction from "../world/actions/useaction";
 import Actor from "../world/actors/actor";
 import Game from "../logic/game";
 import Color from "./color";
+import AttackAction from "../world/actions/attackaction";
 
 class GraphicsActor {
   private actor: Actor;
@@ -87,6 +88,8 @@ class GraphicsActor {
     else if (action instanceof OpenDoorAction)
       this.bump(action.position.x, action.position.y);
     else if (action instanceof UseAction)
+      this.bump(action.position.x, action.position.y);
+    else if (action instanceof AttackAction)
       this.bump(action.position.x, action.position.y);
     else if (action instanceof StepAction)
       this.move(action.position.x, action.position.y);
