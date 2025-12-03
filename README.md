@@ -16,6 +16,7 @@ TODO:
 - [x] Improve entity management
 - [x] Turn-based system with energy/speed
 - [x] Perform all animations at once
+- [ ] Decouple wire propagation from value-setting, so the computation can spread over multiple frames
 - [ ] Try to split data from logic more
 - [ ] Fix issue with diagonals in the pathfinding algorithm
 

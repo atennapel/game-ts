@@ -14,8 +14,7 @@ class AttackAction extends Action {
   }
 
   override tryPerform(game: Game, actor: Actor): Action[] | boolean {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const target = game.world.actorAt(x, y);
     if (!target || this.target != target) return false;
     return true;

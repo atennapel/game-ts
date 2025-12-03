@@ -17,8 +17,10 @@ class Main {
   private readonly height: number = 20;
   private readonly spriteWidth: number = 32;
   private readonly spriteHeight: number = 32;
+  private readonly spriteWidthHalf: number = this.spriteWidth / 2;
+  private readonly spriteHeightHalf: number = this.spriteHeight / 2;
 
-  private readonly game: Game = new Game(this.width, this.height);
+  readonly game: Game = new Game(this.width, this.height);
   private readonly world: World = this.game.world;
   private readonly map: Map = this.world.map;
 
@@ -122,24 +124,21 @@ class Main {
   }
 
   private startPendingAnimations(): void {
-    const pendingAnimations = this.pendingAnimations;
     const nextPendingAnimations: { actor: GraphicsActor, action: Action }[] = [];
-    for (let i = 0; i < pendingAnimations.length; i++) {
-      const animation = pendingAnimations[i];
-      if (animation.actor.isMoving())
+    for (const animation of this.pendingAnimations) {
+      const actor = animation.actor;
+      if (actor.isMoving())
         nextPendingAnimations.push(animation);
       else
-        animation.actor.animate(animation.action);
+        actor.animate(animation.action);
     }
     this.pendingAnimations = nextPendingAnimations;
   }
 
   private anyActorsMoving(): boolean {
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++) {
-      if (actors[i].isMoving()) {
+    for (const actor of this.actors) {
+      if (actor.isMoving())
         return true;
-      }
     }
     return false;
   }
@@ -153,9 +152,8 @@ class Main {
     } else {
       const result = this.game.takeTurn();
       if (result) {
-        const { action, actorIndex } = result;
-        const actor = this.actors[actorIndex];
-        this.pendingAnimations.push({ actor, action });
+        const actor = this.actors[result.actorIndex];
+        this.pendingAnimations.push({ actor, action: result.action });
         if (actor.isPlayer()) this.waitingOnAnimations = true;
       }
     }
@@ -170,15 +168,17 @@ class Main {
     }
 
     // update actor animations
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++)
-      actors[i].updateAnimation(delta);
+    for (const actor of this.actors) actor.updateAnimation(delta);
   }
 
   private draw(): void {
+    const ctx = this.ctx!;
+    const mx = this.mx;
+    const my = this.my;
+
     // clear canvas
-    this.ctx!.fillStyle = "white";
-    this.ctx!.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
 
     // draw map
     const tileSpriteCache: number[] = [];
@@ -218,9 +218,7 @@ class Main {
     }
 
     // draw actors
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++) {
-      const actor = actors[i];
+    for (const actor of this.actors) {
       if (actor.isPlayer() || this.map.isVisible(actor.x, actor.y))
         this.drawEntity(actor);
     }
@@ -230,55 +228,74 @@ class Main {
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
 
     // draw mouse indicator
-    this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
+    this.drawRect(mx, my, "rgba(0, 160, 0, 0.5)");
+
+    // draw wires
+    const wireStyle = this.world.getValue(mx, my) == 0 ? "darkred" : "darkgreen";
+    for (const target of this.world.getOutgoingWires(mx, my))
+      this.drawLine(mx, my, target.x, target.y, 2, wireStyle);
+    for (const source of this.world.getIncomingWires(mx, my)) {
+      const { x: sx, y: sy } = source;
+      const isOff = this.world.getValue(sx, sy) == 0;
+      this.drawLine(sx, sy, mx, my, 2, isOff ? "red" : "green");
+    }
 
     // draw description text
-    const tileText = Tile.description(this.map.get(this.mx, this.my));
+    const tileActor = this.world.actorAt(mx, my);
+    let tileText: string | null = null;
+    if (tileActor)
+      tileText = tileActor.description();
+    else {
+      const tileDescription = Tile.description(this.map.get(mx, my));
+      if (tileDescription)
+        tileText = this.world.hasValue(mx, my) ? `${tileDescription} (${this.world.getValue(mx, my)})` : tileDescription;
+    }
     if (tileText) {
-      this.ctx!.font = "12px monospace";
-      this.ctx!.fillStyle = "white";
-      this.ctx!.fillRect(0, 0, tileText.length * 8 + 5, 16);
-      this.ctx!.fillStyle = "black";
-      this.ctx!.fillText(tileText, 5, 10);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
+      ctx.fillStyle = "black";
+      ctx.fillText(tileText, 5, 10);
     }
 
     // draw fps
     const fpsText = `fps: ${this.fps.toFixed(2)}`;
-    this.ctx!.font = "12px monospace"
-    this.ctx!.fillStyle = "white";
-    this.ctx!.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
-    this.ctx!.fillStyle = "black";
-    this.ctx!.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
+    ctx.font = "12px monospace"
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
 
     // draw position
     const posText = `pos: ${this.mx}, ${this.my}`;
-    this.ctx!.font = "12px monospace"
-    this.ctx!.fillStyle = "white";
-    this.ctx!.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
-    this.ctx!.fillStyle = "black";
-    this.ctx!.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+    ctx.font = "12px monospace"
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
 
     // draw turns
     const turnsText = `turns: ${this.game.turns} | ${this.game.playerTurns}`;
-    this.ctx!.font = "12px monospace"
-    this.ctx!.fillStyle = "white";
-    this.ctx!.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
-    this.ctx!.fillStyle = "black";
-    this.ctx!.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
+    ctx.font = "12px monospace"
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
 
     // debug
     const debugText = `debug: ${this.pendingAnimations.length}`;
-    this.ctx!.font = "12px monospace"
-    this.ctx!.fillStyle = "white";
-    this.ctx!.fillRect(this.width * this.spriteWidth - 400, 0, 100, 16);
-    this.ctx!.fillStyle = "black";
-    this.ctx!.fillText(debugText, this.width * this.spriteWidth - 400 + 5, 10);
+    ctx.font = "12px monospace"
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 400, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(debugText, this.width * this.spriteWidth - 400 + 5, 10);
 
   }
 
   private drawRect(x: number, y: number, style: string): void {
-    this.ctx!.fillStyle = style;
-    this.ctx!.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
+    const ctx = this.ctx!;
+    ctx.fillStyle = style;
+    ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
   }
 
   private drawSpriteAbsolute(index: number, x: number, y: number, foreground: Color, background: Color = Color.White): void {
@@ -292,6 +309,20 @@ class Main {
 
   private drawEntity(entity: GraphicsActor): void {
     this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, Color.Transparent);
+  }
+
+  private drawLine(x: number, y: number, tx: number, ty: number, lineWidth: number, style: string): void {
+    const ctx = this.ctx!;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    const w = this.spriteWidth;
+    const wh = this.spriteWidthHalf;
+    const h = this.spriteHeight;
+    const hh = this.spriteHeightHalf;
+    ctx.moveTo(x * w + wh, y * h + hh);
+    ctx.lineTo(tx * w + wh, ty * h + hh);
+    ctx.strokeStyle = style;
+    ctx.stroke();
   }
 }
 

@@ -9,6 +9,10 @@ class NPC extends Entity {
     this.speed = 50;
   }
 
+  override description(): string {
+    return "npc";
+  }
+
   override isPlayer(): boolean {
     return false;
   }

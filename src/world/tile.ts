@@ -7,7 +7,12 @@ enum Tile {
   Chair,
   Table,
   Computer,
-  Lightbulb,
+  LightbulbOff,
+  LightbulbOn,
+  SwitchOff,
+  SwitchOn,
+  GateNand,
+  Button,
 }
 
 namespace Tile {
@@ -18,7 +23,11 @@ namespace Tile {
       case Tile.Fire: return true;
       case Tile.Table: return true;
       case Tile.Computer: return true;
-      case Tile.Lightbulb: return true;
+      case Tile.LightbulbOff: return true;
+      case Tile.LightbulbOn: return true;
+      case Tile.SwitchOff: return true;
+      case Tile.SwitchOn: return true;
+      case Tile.GateNand: return true;
       default: return false;
     }
   }
@@ -35,7 +44,12 @@ namespace Tile {
       case Tile.Chair: return "chair";
       case Tile.Table: return "table";
       case Tile.Computer: return "computer";
-      case Tile.Lightbulb: return "lightbulb";
+      case Tile.LightbulbOff: return "lightbulb";
+      case Tile.LightbulbOn: return "lightbulb";
+      case Tile.SwitchOff: return "switch";
+      case Tile.SwitchOn: return "switch";
+      case Tile.GateNand: return "NAND gate";
+      case Tile.Button: return "button";
       default: return null;
     }
   }

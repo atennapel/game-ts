@@ -26,8 +26,7 @@ class Loc {
 
   neighbours(map: M): Loc[] {
     const ns: Loc[] = [];
-    const x = this.x;
-    const y = this.y;
+    const { x, y } = this;
     for (let nx = x - 1; nx <= x + 1; nx++) {
       for (let ny = y - 1; ny <= y + 1; ny++) {
         if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height || (nx == x && ny == y) || map.isBlocked(nx, ny))

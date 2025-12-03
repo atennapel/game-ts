@@ -19,8 +19,7 @@ class SecondaryAction extends Action {
   override energyCost: number = 0;
 
   override tryPerform(game: Game, actor: Actor): Action[] | boolean {
-    const gx = this.position.x;
-    const gy = this.position.y;
+    const { x: gx, y: gy } = this.position;
     if (gx == actor.x && gy == actor.y)
       return [new WaitAction()];
     const map = game.world.map;

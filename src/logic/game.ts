@@ -4,6 +4,7 @@ import Pos from "../world/pos";
 import ShadowCasting from "./shadowcasting";
 import World from "../world/world";
 import Actor from "../world/actors/actor";
+import TurnResult from "./turnresult";
 
 class Game {
   readonly world: World;
@@ -38,7 +39,7 @@ class Game {
     this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 
-  takeTurn(): { action: Action, actorIndex: number } | null {
+  takeTurn(): TurnResult | null {
     const actors = this.world.actors;
     if (actors.length == 0) return null;
     const actorIndex = this.actorIndex;
@@ -52,7 +53,7 @@ class Game {
       } else {
         const succeeded = this.performAction(actor, action);
         if (!succeeded) return null;
-        return { action, actorIndex };
+        return new TurnResult(actorIndex, action);
       }
     } else {
       this.advanceActor();

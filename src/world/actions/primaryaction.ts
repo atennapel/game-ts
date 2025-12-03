@@ -21,8 +21,7 @@ class PrimaryAction extends Action {
   override energyCost: number = 0;
 
   override tryPerform(game: Game, actor: Actor): Action[] | boolean {
-    const gx = this.position.x;
-    const gy = this.position.y;
+    const { x: gx, y: gy } = this.position;
 
     const map = game.world.map;
     const tile = map.get(gx, gy);
@@ -38,7 +37,7 @@ class PrimaryAction extends Action {
         return actions;
       }
       return false;
-    } else if (tile == Tile.Computer) {
+    } else if (tile == Tile.Computer || tile == Tile.SwitchOff || tile == Tile.SwitchOn) {
       map.set(gx, gy, Tile.Empty);
       const path = game.findPath(actor.x, actor.y, gx, gy);
       map.set(gx, gy, tile);

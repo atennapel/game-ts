@@ -7,6 +7,10 @@ class Player extends Entity {
     this.speed = 100;
   }
 
+  override description(): string {
+    return "player";
+  }
+
   override isPlayer(): boolean {
     return true;
   }

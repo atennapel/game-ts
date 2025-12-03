@@ -13,8 +13,7 @@ class OpenDoorAction extends Action {
   }
 
   override tryPerform(game: Game, actor: Actor): Action[] | boolean {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const map = game.world.map;
     if (map.get(x, y) != Tile.ClosedDoor)
       return false;

@@ -10,7 +10,12 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Chair"] = 5] = "Chair";
   Tile2[Tile2["Table"] = 6] = "Table";
   Tile2[Tile2["Computer"] = 7] = "Computer";
-  Tile2[Tile2["Lightbulb"] = 8] = "Lightbulb";
+  Tile2[Tile2["LightbulbOff"] = 8] = "LightbulbOff";
+  Tile2[Tile2["LightbulbOn"] = 9] = "LightbulbOn";
+  Tile2[Tile2["SwitchOff"] = 10] = "SwitchOff";
+  Tile2[Tile2["SwitchOn"] = 11] = "SwitchOn";
+  Tile2[Tile2["GateNand"] = 12] = "GateNand";
+  Tile2[Tile2["Button"] = 13] = "Button";
   return Tile2;
 })(Tile || {});
 ((Tile2) => {
@@ -26,7 +31,15 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
         return true;
       case 7 /* Computer */:
         return true;
-      case 8 /* Lightbulb */:
+      case 8 /* LightbulbOff */:
+        return true;
+      case 9 /* LightbulbOn */:
+        return true;
+      case 10 /* SwitchOff */:
+        return true;
+      case 11 /* SwitchOn */:
+        return true;
+      case 12 /* GateNand */:
         return true;
       default:
         return false;
@@ -51,8 +64,18 @@ var Tile = /* @__PURE__ */ ((Tile2) => {
         return "table";
       case 7 /* Computer */:
         return "computer";
-      case 8 /* Lightbulb */:
+      case 8 /* LightbulbOff */:
         return "lightbulb";
+      case 9 /* LightbulbOn */:
+        return "lightbulb";
+      case 10 /* SwitchOff */:
+        return "switch";
+      case 11 /* SwitchOn */:
+        return "switch";
+      case 12 /* GateNand */:
+        return "NAND gate";
+      case 13 /* Button */:
+        return "button";
       default:
         return null;
     }
@@ -95,15 +118,17 @@ var StepAction = class extends action_default {
     this.position = position;
   }
   tryPerform(game, actor) {
-    const x = this.position.x;
-    const y = this.position.y;
-    if (game.world.map.isBlocked(x, y))
-      return false;
-    if (game.world.actorAt(x, y))
-      return false;
+    const world = game.world;
+    const map = world.map;
+    const { x, y } = this.position;
+    const { x: ax, y: ay } = actor;
+    if (map.isBlocked(x, y)) return false;
+    if (world.actorAt(x, y)) return false;
+    if (map.get(ax, ay) == tile_default.Button) world.setValue(ax, ay, 0);
     actor.x = x;
     actor.y = y;
     if (actor.isPlayer()) game.refreshVisibility();
+    if (map.get(x, y) == tile_default.Button) world.setValue(x, y, 1);
     return true;
   }
 };
@@ -134,8 +159,7 @@ var OpenDoorAction = class extends action_default {
     this.position = position;
   }
   tryPerform(game, actor) {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const map = game.world.map;
     if (map.get(x, y) != tile_default.ClosedDoor)
       return false;
@@ -154,13 +178,20 @@ var UseAction = class extends action_default {
     this.position = position;
   }
   tryPerform(game, actor) {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const map = game.world.map;
-    if (map.get(x, y) != tile_default.Computer)
-      return false;
-    game.world.toggleSignal(0);
-    return true;
+    const tile = map.get(x, y);
+    if (tile == tile_default.Computer) {
+      const value = game.world.getValue(x, y);
+      game.world.setValue(x, y, value == 0 ? 1 : 0);
+      return true;
+    } else if (tile == tile_default.SwitchOff || tile == tile_default.SwitchOn) {
+      const value = game.world.getValue(x, y);
+      game.world.setValue(x, y, value == 0 ? 1 : 0);
+      game.world.map.set(x, y, value == 0 ? tile_default.SwitchOn : tile_default.SwitchOff);
+      return true;
+    }
+    return false;
   }
 };
 var useaction_default = UseAction;
@@ -175,8 +206,7 @@ var AttackAction = class extends action_default {
     this.target = target;
   }
   tryPerform(game, actor) {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const target = game.world.actorAt(x, y);
     if (!target || this.target != target) return false;
     return true;
@@ -193,8 +223,7 @@ var PrimaryAction = class extends action_default {
   }
   energyCost = 0;
   tryPerform(game, actor) {
-    const gx = this.position.x;
-    const gy = this.position.y;
+    const { x: gx, y: gy } = this.position;
     const map = game.world.map;
     const tile = map.get(gx, gy);
     if (tile == tile_default.ClosedDoor) {
@@ -209,7 +238,7 @@ var PrimaryAction = class extends action_default {
         return actions;
       }
       return false;
-    } else if (tile == tile_default.Computer) {
+    } else if (tile == tile_default.Computer || tile == tile_default.SwitchOff || tile == tile_default.SwitchOn) {
       map.set(gx, gy, tile_default.Empty);
       const path = game.findPath(actor.x, actor.y, gx, gy);
       map.set(gx, gy, tile);
@@ -256,8 +285,7 @@ var CloseDoorAction = class extends action_default {
     this.position = position;
   }
   tryPerform(game, actor) {
-    const x = this.position.x;
-    const y = this.position.y;
+    const { x, y } = this.position;
     const map = game.world.map;
     if (map.get(x, y) != tile_default.OpenDoor)
       return false;
@@ -286,8 +314,7 @@ var SecondaryAction = class extends action_default {
   }
   energyCost = 0;
   tryPerform(game, actor) {
-    const gx = this.position.x;
-    const gy = this.position.y;
+    const { x: gx, y: gy } = this.position;
     if (gx == actor.x && gy == actor.y)
       return [new waitaction_default()];
     const map = game.world.map;
@@ -519,8 +546,7 @@ var Loc = class _Loc {
   }
   neighbours(map) {
     const ns = [];
-    const x = this.x;
-    const y = this.y;
+    const { x, y } = this;
     for (let nx = x - 1; nx <= x + 1; nx++) {
       for (let ny = y - 1; ny <= y + 1; ny++) {
         if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height || nx == x && ny == y || map.isBlocked(nx, ny))
@@ -762,6 +788,9 @@ var NPC = class extends actor_default {
     super(x, y);
     this.speed = 50;
   }
+  description() {
+    return "npc";
+  }
   isPlayer() {
     return false;
   }
@@ -781,6 +810,9 @@ var Player = class extends actor_default {
   constructor(x, y) {
     super(x, y);
     this.speed = 100;
+  }
+  description() {
+    return "player";
   }
   isPlayer() {
     return true;
@@ -858,7 +890,9 @@ var World = class {
   map;
   player;
   actors = [];
-  signals = /* @__PURE__ */ new Map();
+  values = /* @__PURE__ */ new Map();
+  wiresOutgoing = /* @__PURE__ */ new Map();
+  wiresIncoming = /* @__PURE__ */ new Map();
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
@@ -882,21 +916,112 @@ var World = class {
     this.map.set(8, 9, tile_default.Table);
     this.map.set(9, 9, tile_default.Chair);
     this.map.set(9, 7, tile_default.Computer);
-    this.map.set(7, 7, tile_default.Lightbulb);
+    this.map.set(7, 7, tile_default.LightbulbOff);
+    this.map.set(3, 14, tile_default.SwitchOff);
+    this.map.set(3, 16, tile_default.SwitchOn);
+    this.map.set(6, 15, tile_default.GateNand);
+    this.map.set(9, 15, tile_default.LightbulbOff);
+    this.map.set(3, 12, tile_default.Button);
+    this.map.set(5, 12, tile_default.LightbulbOff);
+    this.addWire(9, 7, 7, 7);
+    this.addWire(3, 14, 6, 15);
+    this.addWire(3, 16, 6, 15);
+    this.addWire(6, 15, 9, 15);
+    this.addWire(3, 12, 5, 12);
+    this.setValue(3, 14, 0);
+    this.setValue(3, 16, 0);
+    this.setValue(3, 12, 0);
+    this.setValue(5, 12, 0);
   }
-  getSignal(ix) {
-    return this.signals.get(ix) || false;
+  hasValue(x, y) {
+    return this.values.has(`${x},${y}`);
   }
-  setSignal(ix, value) {
-    this.signals.set(ix, value);
+  getValue(x, y) {
+    return this.values.get(`${x},${y}`) || 0;
   }
-  toggleSignal(ix) {
-    this.signals.set(ix, !this.signals.get(ix));
+  setValue(x, y, value) {
+    this.values.set(`${x},${y}`, value);
+    for (const target of this.getOutgoingWires(x, y)) this.updateValueAt(target);
+  }
+  updateValueAt(pos) {
+    let stack = [pos];
+    let loops = 0;
+    while (stack.length > 0 && loops++ < 1e3) {
+      const { x, y } = stack.pop();
+      const tile = this.map.get(x, y);
+      if (tile == tile_default.GateNand) {
+        let anyZero = false;
+        for (const source of this.getIncomingWires(x, y)) {
+          if (this.getValue(source.x, source.y) == 0) {
+            anyZero = true;
+            break;
+          }
+        }
+        stack = this.propogate(stack, x, y, anyZero ? 1 : 0) || stack;
+      } else if (tile == tile_default.LightbulbOn || tile == tile_default.LightbulbOff) {
+        let atleastOne = false;
+        for (const source of this.getIncomingWires(x, y)) {
+          if (this.getValue(source.x, source.y) != 0) {
+            atleastOne = true;
+            break;
+          }
+        }
+        const newValue = atleastOne ? 1 : 0;
+        const newstack = this.propogate(stack, x, y, newValue);
+        stack = newstack || stack;
+        if (newstack) this.map.set(x, y, newValue ? tile_default.LightbulbOn : tile_default.LightbulbOff);
+      }
+    }
+  }
+  propogate(stack, x, y, newValue) {
+    if (newValue != this.getValue(x, y)) {
+      this.setValue(x, y, newValue);
+      const outgoing = this.getOutgoingWires(x, y);
+      return outgoing.length > 0 ? outgoing.concat(stack) : stack;
+    }
+    return null;
+  }
+  getOutgoingWires(x, y) {
+    return this.wiresOutgoing.get(`${x},${y}`) || [];
+  }
+  getIncomingWires(x, y) {
+    return this.wiresIncoming.get(`${x},${y}`) || [];
+  }
+  addWire(x, y, tx, ty) {
+    const outgoing = this.getOutgoingWires(x, y);
+    for (const wire of outgoing) {
+      if (wire.x == tx && wire.y == ty)
+        return;
+    }
+    const incoming = this.getIncomingWires(tx, ty);
+    const target = new pos_default(tx, ty);
+    outgoing.push(target);
+    incoming.push(new pos_default(x, y));
+    this.wiresOutgoing.set(`${x},${y}`, outgoing);
+    this.wiresIncoming.set(`${tx},${ty}`, incoming);
+    this.updateValueAt(target);
+  }
+  removeWire(x, y, tx, ty) {
+    const outgoing = this.getOutgoingWires(x, y);
+    const incoming = this.getIncomingWires(tx, ty);
+    for (let i = 0; i < outgoing.length; i++) {
+      const wire = outgoing[i];
+      if (wire.x == tx && wire.y == ty) {
+        outgoing.splice(i, 1);
+        break;
+      }
+    }
+    for (let i = 0; i < incoming.length; i++) {
+      const wire = incoming[i];
+      if (wire.x == x && wire.y == y) {
+        outgoing.splice(i, 1);
+        break;
+      }
+    }
+    this.updateValueAt(new pos_default(tx, ty));
   }
   actorAt(x, y) {
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++) {
-      const actor = actors[i];
+    for (const actor of this.actors) {
       if (actor.x == x && actor.y == y)
         return actor;
     }
@@ -904,6 +1029,17 @@ var World = class {
   }
 };
 var world_default = World;
+
+// src/logic/turnresult.ts
+var TurnResult = class {
+  actorIndex;
+  action;
+  constructor(actorIndex, action) {
+    this.actorIndex = actorIndex;
+    this.action = action;
+  }
+};
+var turnresult_default = TurnResult;
 
 // src/logic/game.ts
 var Game = class {
@@ -945,7 +1081,7 @@ var Game = class {
       } else {
         const succeeded = this.performAction(actor, action);
         if (!succeeded) return null;
-        return { action, actorIndex };
+        return new turnresult_default(actorIndex, action);
       }
     } else {
       this.advanceActor();
@@ -1219,22 +1355,6 @@ var AnimatedTile = class extends graphicstile_default {
 };
 var animatedtile_default = AnimatedTile;
 
-// src/graphics/tiles/lightbulbtile.ts
-var LightbulbTile = class extends graphicstile_default {
-  signal;
-  constructor(signal) {
-    super();
-    this.signal = signal;
-  }
-  sprite(world, index) {
-    return 11;
-  }
-  color(world, index, background) {
-    return background ? color_default.Transparent : world.getSignal(this.signal) ? color_default.BrightYellow : color_default.DarkGrey;
-  }
-};
-var lightbulbtile_default = LightbulbTile;
-
 // src/graphics/tiles/statictile.ts
 var StaticTile = class extends graphicstile_default {
   mySprite;
@@ -1273,8 +1393,18 @@ var tiles = [
   new statictile_default(8, color_default.Transparent, color_default.Brown),
   // Computer
   new animatedtile_default([9, 10], [color_default.White], [color_default.DarkGrey], 4, 4),
-  // Lightbulb
-  new lightbulbtile_default(0)
+  // LightbulbOff
+  new statictile_default(11, color_default.Transparent, color_default.DarkGrey),
+  // LightbulbOn
+  new statictile_default(11, color_default.Transparent, color_default.BrightYellow),
+  // SwitchOff
+  new statictile_default(13, color_default.Transparent, color_default.DarkGrey),
+  // SwitchOn
+  new statictile_default(14, color_default.Transparent, color_default.DarkGrey),
+  // GateNand
+  new statictile_default(12, color_default.White, color_default.DarkGrey),
+  // Button
+  new statictile_default(15, color_default.Transparent, color_default.DarkGrey)
 ];
 var graphicstiles_default = tiles;
 
@@ -1284,6 +1414,8 @@ var Main = class {
   height = 20;
   spriteWidth = 32;
   spriteHeight = 32;
+  spriteWidthHalf = this.spriteWidth / 2;
+  spriteHeightHalf = this.spriteHeight / 2;
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
@@ -1363,23 +1495,20 @@ var Main = class {
     requestAnimationFrame((time2) => this.loop(time2));
   }
   startPendingAnimations() {
-    const pendingAnimations = this.pendingAnimations;
     const nextPendingAnimations = [];
-    for (let i = 0; i < pendingAnimations.length; i++) {
-      const animation = pendingAnimations[i];
-      if (animation.actor.isMoving())
+    for (const animation of this.pendingAnimations) {
+      const actor = animation.actor;
+      if (actor.isMoving())
         nextPendingAnimations.push(animation);
       else
-        animation.actor.animate(animation.action);
+        actor.animate(animation.action);
     }
     this.pendingAnimations = nextPendingAnimations;
   }
   anyActorsMoving() {
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++) {
-      if (actors[i].isMoving()) {
+    for (const actor of this.actors) {
+      if (actor.isMoving())
         return true;
-      }
     }
     return false;
   }
@@ -1391,9 +1520,8 @@ var Main = class {
     } else {
       const result = this.game.takeTurn();
       if (result) {
-        const { action, actorIndex } = result;
-        const actor = this.actors[actorIndex];
-        this.pendingAnimations.push({ actor, action });
+        const actor = this.actors[result.actorIndex];
+        this.pendingAnimations.push({ actor, action: result.action });
         if (actor.isPlayer()) this.waitingOnAnimations = true;
       }
     }
@@ -1404,13 +1532,14 @@ var Main = class {
       if (this.tileCycleIndex >= this.tileCycleMax)
         this.tileCycleIndex = 0;
     }
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++)
-      actors[i].updateAnimation(delta);
+    for (const actor of this.actors) actor.updateAnimation(delta);
   }
   draw() {
-    this.ctx.fillStyle = "white";
-    this.ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+    const ctx = this.ctx;
+    const mx = this.mx;
+    const my = this.my;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
     const tileSpriteCache = [];
     const tileBackgroundCache = [];
     const tileForegroundCache = [];
@@ -1446,51 +1575,66 @@ var Main = class {
         }
       }
     }
-    const actors = this.actors;
-    for (let i = 0; i < actors.length; i++) {
-      const actor = actors[i];
+    for (const actor of this.actors) {
       if (actor.isPlayer() || this.map.isVisible(actor.x, actor.y))
         this.drawEntity(actor);
     }
     if (!this.world.player.isIdle())
       this.drawRect(this.gx, this.gy, "rgba(0, 0, 160, 0.5)");
-    this.drawRect(this.mx, this.my, "rgba(0, 160, 0, 0.5)");
-    const tileText = tile_default.description(this.map.get(this.mx, this.my));
+    this.drawRect(mx, my, "rgba(0, 160, 0, 0.5)");
+    const wireStyle = this.world.getValue(mx, my) == 0 ? "darkred" : "darkgreen";
+    for (const target of this.world.getOutgoingWires(mx, my))
+      this.drawLine(mx, my, target.x, target.y, 2, wireStyle);
+    for (const source of this.world.getIncomingWires(mx, my)) {
+      const { x: sx, y: sy } = source;
+      const isOff = this.world.getValue(sx, sy) == 0;
+      this.drawLine(sx, sy, mx, my, 2, isOff ? "red" : "green");
+    }
+    const tileActor = this.world.actorAt(mx, my);
+    let tileText = null;
+    if (tileActor)
+      tileText = tileActor.description();
+    else {
+      const tileDescription = tile_default.description(this.map.get(mx, my));
+      if (tileDescription)
+        tileText = this.world.hasValue(mx, my) ? `${tileDescription} (${this.world.getValue(mx, my)})` : tileDescription;
+    }
     if (tileText) {
-      this.ctx.font = "12px monospace";
-      this.ctx.fillStyle = "white";
-      this.ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
-      this.ctx.fillStyle = "black";
-      this.ctx.fillText(tileText, 5, 10);
+      ctx.font = "12px monospace";
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
+      ctx.fillStyle = "black";
+      ctx.fillText(tileText, 5, 10);
     }
     const fpsText = `fps: ${this.fps.toFixed(2)}`;
-    this.ctx.font = "12px monospace";
-    this.ctx.fillStyle = "white";
-    this.ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
-    this.ctx.fillStyle = "black";
-    this.ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
     const posText = `pos: ${this.mx}, ${this.my}`;
-    this.ctx.font = "12px monospace";
-    this.ctx.fillStyle = "white";
-    this.ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
-    this.ctx.fillStyle = "black";
-    this.ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
     const turnsText = `turns: ${this.game.turns} | ${this.game.playerTurns}`;
-    this.ctx.font = "12px monospace";
-    this.ctx.fillStyle = "white";
-    this.ctx.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
-    this.ctx.fillStyle = "black";
-    this.ctx.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 300, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(turnsText, this.width * this.spriteWidth - 300 + 5, 10);
     const debugText = `debug: ${this.pendingAnimations.length}`;
-    this.ctx.font = "12px monospace";
-    this.ctx.fillStyle = "white";
-    this.ctx.fillRect(this.width * this.spriteWidth - 400, 0, 100, 16);
-    this.ctx.fillStyle = "black";
-    this.ctx.fillText(debugText, this.width * this.spriteWidth - 400 + 5, 10);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "white";
+    ctx.fillRect(this.width * this.spriteWidth - 400, 0, 100, 16);
+    ctx.fillStyle = "black";
+    ctx.fillText(debugText, this.width * this.spriteWidth - 400 + 5, 10);
   }
   drawRect(x, y, style) {
-    this.ctx.fillStyle = style;
-    this.ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
+    const ctx = this.ctx;
+    ctx.fillStyle = style;
+    ctx.fillRect(x * this.spriteWidth, y * this.spriteHeight, this.spriteWidth, this.spriteHeight);
   }
   drawSpriteAbsolute(index, x, y, foreground, background = color_default.White) {
     const image = this.sprites.get(index, background, foreground);
@@ -1501,6 +1645,19 @@ var Main = class {
   }
   drawEntity(entity) {
     this.drawSpriteAbsolute(entity.sprite, entity.absoluteX, entity.absoluteY, entity.color, color_default.Transparent);
+  }
+  drawLine(x, y, tx, ty, lineWidth, style) {
+    const ctx = this.ctx;
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    const w = this.spriteWidth;
+    const wh = this.spriteWidthHalf;
+    const h = this.spriteHeight;
+    const hh = this.spriteHeightHalf;
+    ctx.moveTo(x * w + wh, y * h + hh);
+    ctx.lineTo(tx * w + wh, ty * h + hh);
+    ctx.strokeStyle = style;
+    ctx.stroke();
   }
 };
 var main_default = Main;

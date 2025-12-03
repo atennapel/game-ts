@@ -19,6 +19,8 @@ abstract class Actor {
 
   abstract decideNextActions(game: Game): boolean;
 
+  abstract description(): string;
+
   resetActions(): void {
     this.actionStack = [];
   }
