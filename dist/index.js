@@ -893,6 +893,7 @@ var World = class {
   values = /* @__PURE__ */ new Map();
   wiresOutgoing = /* @__PURE__ */ new Map();
   wiresIncoming = /* @__PURE__ */ new Map();
+  valuePropogationStack = [];
   constructor(width, height) {
     this.map = new map_default(width, height);
     this.player = new player_default(1, 1);
@@ -932,6 +933,7 @@ var World = class {
     this.setValue(3, 16, 0);
     this.setValue(3, 12, 0);
     this.setValue(5, 12, 0);
+    this.propogateValues(1e4);
   }
   hasValue(x, y) {
     return this.values.has(`${x},${y}`);
@@ -943,10 +945,13 @@ var World = class {
     this.values.set(`${x},${y}`, value);
     for (const target of this.getOutgoingWires(x, y)) this.updateValueAt(target);
   }
-  updateValueAt(pos) {
-    let stack = [pos];
+  update() {
+    this.propogateValues();
+  }
+  propogateValues(limit = 100) {
+    let stack = this.valuePropogationStack;
     let loops = 0;
-    while (stack.length > 0 && loops++ < 1e3) {
+    while (stack.length > 0 && loops++ < limit) {
       const { x, y } = stack.pop();
       const tile = this.map.get(x, y);
       if (tile == tile_default.GateNand) {
@@ -972,6 +977,7 @@ var World = class {
         if (newstack) this.map.set(x, y, newValue ? tile_default.LightbulbOn : tile_default.LightbulbOff);
       }
     }
+    this.valuePropogationStack = stack;
   }
   propogate(stack, x, y, newValue) {
     if (newValue != this.getValue(x, y)) {
@@ -980,6 +986,9 @@ var World = class {
       return outgoing.length > 0 ? outgoing.concat(stack) : stack;
     }
     return null;
+  }
+  updateValueAt(pos) {
+    this.valuePropogationStack = [pos].concat(this.valuePropogationStack);
   }
   getOutgoingWires(x, y) {
     return this.wiresOutgoing.get(`${x},${y}`) || [];
@@ -1066,6 +1075,9 @@ var Game = class {
   }
   advanceActor() {
     this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
+  }
+  update() {
+    this.world.update();
   }
   takeTurn() {
     const actors = this.world.actors;
@@ -1513,6 +1525,7 @@ var Main = class {
     return false;
   }
   logic(delta) {
+    this.game.update();
     if (this.waitingOnAnimations) {
       this.startPendingAnimations();
       if (this.pendingAnimations.length == 0 && !this.anyActorsMoving())

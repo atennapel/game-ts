@@ -144,6 +144,8 @@ class Main {
   }
 
   private logic(delta: number): void {
+    this.game.update();
+
     // take a turn
     if (this.waitingOnAnimations) {
       this.startPendingAnimations();

@@ -39,6 +39,10 @@ class Game {
     this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 
+  update(): void {
+    this.world.update();
+  }
+
   takeTurn(): TurnResult | null {
     const actors = this.world.actors;
     if (actors.length == 0) return null;

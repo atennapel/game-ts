@@ -13,6 +13,8 @@ class World {
   private readonly wiresOutgoing: Map<string, Pos[]> = new Map();
   private readonly wiresIncoming: Map<string, Pos[]> = new Map();
 
+  private valuePropogationStack: Pos[] = [];
+
   constructor(width: number, height: number) {
     this.map = new M(width, height);
     this.player = new Player(1, 1);
@@ -64,6 +66,8 @@ class World {
 
     this.setValue(3, 12, 0);
     this.setValue(5, 12, 0);
+
+    this.propogateValues(10000);
   }
 
   hasValue(x: number, y: number): boolean {
@@ -79,10 +83,14 @@ class World {
     for (const target of this.getOutgoingWires(x, y)) this.updateValueAt(target);
   }
 
-  private updateValueAt(pos: Pos): void {
-    let stack: Pos[] = [pos];
+  update(): void {
+    this.propogateValues();
+  }
+
+  private propogateValues(limit: number = 100): void {
+    let stack = this.valuePropogationStack;
     let loops = 0; // infinite loop protection
-    while (stack.length > 0 && loops++ < 1000) {
+    while (stack.length > 0 && loops++ < limit) {
       const { x, y } = stack.pop()!;
       const tile = this.map.get(x, y);
       if (tile == Tile.GateNand) {
@@ -108,6 +116,7 @@ class World {
         if (newstack) this.map.set(x, y, newValue ? Tile.LightbulbOn : Tile.LightbulbOff);
       }
     }
+    this.valuePropogationStack = stack;
   }
 
   private propogate(stack: Pos[], x: number, y: number, newValue: number): Pos[] | null {
@@ -117,6 +126,10 @@ class World {
       return outgoing.length > 0 ? outgoing.concat(stack) : stack;
     }
     return null;
+  }
+
+  private updateValueAt(pos: Pos): void {
+    this.valuePropogationStack = [pos].concat(this.valuePropogationStack);
   }
 
   getOutgoingWires(x: number, y: number): Pos[] {
