@@ -61,18 +61,18 @@ class Sprites {
       const g = data[i + 1];
       const b = data[i + 2];
       const a = data[i + 3];
-      if (r == 255 && g == 255 && b == 255) {
-        // white => background
-        data[i] = backgroundColor.r;
-        data[i + 1] = backgroundColor.g;
-        data[i + 2] = backgroundColor.b;
-        data[i + 3] = backgroundColor.a;
-      } else if (a == 0) {
+      if (a == 0) {
         // transparent
         data[i] = transparentColor.r;
         data[i + 1] = transparentColor.g;
         data[i + 2] = transparentColor.b;
         data[i + 3] = transparentColor.a;
+      } else if (r == 255 && g == 255 && b == 255) {
+        // white => background
+        data[i] = backgroundColor.r;
+        data[i + 1] = backgroundColor.g;
+        data[i + 2] = backgroundColor.b;
+        data[i + 3] = backgroundColor.a;
       } else {
         // any other color => foreground
         data[i] = foregroundColor.r;

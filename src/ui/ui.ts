@@ -1,3 +1,7 @@
+import Game from "../game/game";
+import Map from "../game/world/map";
+import Tile from "../game/world/tile";
+import World from "../game/world/world";
 import Color from "./color";
 import Sprites from "./sprites";
 
@@ -16,8 +20,17 @@ class UI {
   private lastTime: DOMHighResTimeStamp = 0;
   private fps: number = 0;
 
+  private tileCycleIndex: number = 0;
+  private tileCycleAcc: number = 0;
+  private tileCycleSpeed: number = 64;
+  private tileCycleMax: number = 60;
+
   private mx: number = 0;
   private my: number = 0;
+
+  readonly game: Game = new Game(this.width, this.height);
+  private readonly world: World = this.game.world;
+  private readonly map: Map = this.world.map;
 
   async initialize(
     canvasId: string,
@@ -42,12 +55,17 @@ class UI {
     this.running = true;
     requestAnimationFrame(time => {
       this.lastTime = time;
+      this.init();
       requestAnimationFrame(time => this.loop(time));
     });
   }
 
   stop(): void {
     this.running = false;
+  }
+
+  private init(): void {
+    this.game.refreshVisibility(1, 1);
   }
 
   private loop(time: DOMHighResTimeStamp): void {
@@ -73,10 +91,19 @@ class UI {
   private handleMouseDown(event: MouseEvent): void {
     const mx = this.mx;
     const my = this.my;
+    this.game.refreshVisibility(mx, my);
   }
 
   // logic
   private update(delta: number): void {
+    // update tile animations
+    this.tileCycleAcc += delta;
+    while (this.tileCycleAcc >= this.tileCycleSpeed) {
+      this.tileCycleAcc -= this.tileCycleSpeed;
+      this.tileCycleIndex++;
+      if (this.tileCycleIndex >= this.tileCycleMax)
+        this.tileCycleIndex = 0;
+    }
   }
 
   // drawing
@@ -89,8 +116,43 @@ class UI {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
 
+    // draw map
+    const tileSpriteCache: number[] = [];
+    const tileBackgroundCache: Color[] = [];
+    const tileForegroundCache: Color[] = [];
+    const map = this.map;
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        const visible = map.isVisible(x, y);
+        const tile = map.get(x, y);
+        let sprite;
+        let foreground;
+        let background = tileBackgroundCache[tile];
+        if (background) {
+          sprite = tileSpriteCache[tile];
+          foreground = tileForegroundCache[tile];
+        } else {
+          const info = this.getTileDrawingInfo(tile);
+          sprite = info.sprite;
+          background = info.background;
+          foreground = info.foreground;
+          tileSpriteCache[tile] = sprite;
+          tileBackgroundCache[tile] = background;
+          tileForegroundCache[tile] = foreground;
+        }
+        if (visible) {
+          this.drawSprite(sprite, x, y, background, foreground);
+        } else if (map.isExplored(x, y)) {
+          this.drawSprite(sprite, x, y, background, foreground);
+          this.drawRect(x, y, Color.NotVisible);
+        } else {
+          this.drawRect(x, y, Color.Black);
+        }
+      }
+    }
+
     // draw mouse indicator
-    this.drawRect(mx, my, new Color(0, 160, 0, 0.5));
+    this.drawRect(mx, my, Color.MouseIndicator);
 
     // draw fps
     const fpsText = `fps: ${this.fps.toFixed(2)}`;
@@ -107,6 +169,28 @@ class UI {
     ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
     ctx.fillStyle = "black";
     ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+  }
+
+  private getTileDrawingInfo(tile: Tile): { sprite: number, background: Color, foreground: Color } {
+    switch (tile) {
+      case Tile.Empty: return { sprite: 0, background: Color.Transparent, foreground: Color.Transparent };
+      case Tile.Wall: return { sprite: 2, background: Color.White, foreground: Color.Black };
+      case Tile.Fire: return this.animatedTile([5, 6], [Color.Transparent], [Color.Red, Color.Red155], 2, 2);
+    }
+  }
+
+  private animatedTile(
+    sprites: number[],
+    backgroundColors: Color[],
+    foregroundColors: Color[],
+    spriteAnimationSpeed: number,
+    colorAnimationSpeed: number): { sprite: number, background: Color, foreground: Color } {
+    const index = this.tileCycleIndex;
+    const sprite = sprites[Math.floor(index / spriteAnimationSpeed) % sprites.length];
+    const i = Math.floor(index / colorAnimationSpeed);
+    const background = backgroundColors[i % backgroundColors.length];
+    const foreground = foregroundColors[i % foregroundColors.length];
+    return { sprite, background, foreground };
   }
 
   // drawing helpers
