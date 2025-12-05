@@ -1,9 +1,8 @@
 import Action from "../actions/action";
 import Game from "../../logic/game";
+import Entity from "../entities/entity";
 
-abstract class Actor {
-  x: number;
-  y: number;
+abstract class Actor extends Entity {
   speed: number = 100;
   energy: number = 0;
   maxEnergy: number = 100;
@@ -11,15 +10,12 @@ abstract class Actor {
   private actionStack: Action[] = [];
 
   constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
+    super(x, y);
   }
 
   abstract isPlayer(): boolean;
 
   abstract decideNextActions(game: Game): boolean;
-
-  abstract description(): string;
 
   resetActions(): void {
     this.actionStack = [];
