@@ -397,6 +397,25 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
+// src/game/world/entities/entity.ts
+var Entity = class {
+  x;
+  y;
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+};
+var entity_default = Entity;
+
+// src/game/world/entities/table.ts
+var Table = class extends entity_default {
+  description() {
+    return "table";
+  }
+};
+var table_default = Table;
+
 // src/game/world/tile.ts
 var Tile = /* @__PURE__ */ ((Tile2) => {
   Tile2[Tile2["Empty"] = 0] = "Empty";
@@ -487,6 +506,7 @@ var map_default = Map2;
 // src/game/world/world.ts
 var World = class {
   map;
+  entities = [];
   constructor(width, height) {
     this.map = new map_default(width, height);
     for (let x = 0; x < width; x++) {
@@ -500,6 +520,14 @@ var World = class {
       }
     }
     this.map.set(9, 2, tile_default.Fire);
+    this.entities.push(new table_default(8, 9));
+  }
+  entityAt(x, y) {
+    for (let entity of this.entities) {
+      if (entity.x == x && entity.y == y)
+        return entity;
+    }
+    return null;
   }
 };
 var world_default = World;
@@ -550,7 +578,8 @@ var Color = class _Color {
   static Red155 = new _Color(155, 0, 0, 255);
   static Blue = new _Color(0, 255, 0, 255);
   static Green = new _Color(0, 0, 255, 255);
-  static Brown = new _Color(150, 75, 0, 255);
+  static Brown = new _Color(102, 51, 0, 255);
+  static DarkBrown = new _Color(51, 25, 0, 255);
   static BrightYellow = new _Color(255, 234, 0, 255);
   static NotVisible = new _Color(0, 0, 0, 0.5);
   static MouseIndicator = new _Color(0, 160, 0, 0.5);
@@ -717,12 +746,14 @@ var UI = class {
     const ctx = this.ctx;
     const mx = this.mx;
     const my = this.my;
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const map = this.map;
     ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+    ctx.fillRect(0, 0, this.width * spriteWidth, this.height * spriteHeight);
     const tileSpriteCache = [];
     const tileBackgroundCache = [];
     const tileForegroundCache = [];
-    const map = this.map;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
         const visible = map.isVisible(x, y);
@@ -752,19 +783,38 @@ var UI = class {
         }
       }
     }
+    for (let entity of this.world.entities) {
+      if (map.isVisible(entity.x, entity.y))
+        this.drawEntity(entity);
+    }
     this.drawRect(mx, my, color_default.MouseIndicator);
+    if (map.isExplored(mx, my)) {
+      let tileText = null;
+      if (map.isVisible(mx, my)) {
+        const tileEntity = this.world.entityAt(mx, my);
+        if (tileEntity) tileText = tileEntity.description();
+        else tileText = tile_default.description(map.get(mx, my));
+      } else tileText = tile_default.description(map.get(mx, my));
+      if (tileText) {
+        ctx.font = "12px monospace";
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
+        ctx.fillStyle = "black";
+        ctx.fillText(tileText, 5, 10);
+      }
+    }
     const fpsText = `fps: ${this.fps.toFixed(2)}`;
     ctx.font = "12px monospace";
     ctx.fillStyle = "white";
-    ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    ctx.fillRect(this.width * spriteWidth - 100, 0, 100, 16);
     ctx.fillStyle = "black";
-    ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
-    const posText = `pos: ${this.mx}, ${this.my}`;
+    ctx.fillText(fpsText, this.width * spriteWidth - 100 + 5, 10);
+    const posText = `pos: ${mx}, ${my}`;
     ctx.font = "12px monospace";
     ctx.fillStyle = "white";
-    ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    ctx.fillRect(this.width * spriteWidth - 200, 0, 100, 16);
     ctx.fillStyle = "black";
-    ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+    ctx.fillText(posText, this.width * spriteWidth - 200 + 5, 10);
   }
   getTileDrawingInfo(tile) {
     switch (tile) {
@@ -783,6 +833,10 @@ var UI = class {
     const background = backgroundColors[i % backgroundColors.length];
     const foreground = foregroundColors[i % foregroundColors.length];
     return { sprite, background, foreground };
+  }
+  drawEntity(entity) {
+    if (entity instanceof table_default)
+      this.drawSprite(8, entity.x, entity.y, color_default.DarkBrown, color_default.Brown);
   }
   // drawing helpers
   drawSpriteAbsolute(index, x, y, background, foreground) {

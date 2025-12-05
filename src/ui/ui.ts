@@ -1,4 +1,6 @@
 import Game from "../game/game";
+import Entity from "../game/world/entities/entity";
+import Table from "../game/world/entities/table";
 import Map from "../game/world/map";
 import Tile from "../game/world/tile";
 import World from "../game/world/world";
@@ -111,16 +113,18 @@ class UI {
     const ctx = this.ctx!;
     const mx = this.mx;
     const my = this.my;
+    const spriteWidth = this.spriteWidth;
+    const spriteHeight = this.spriteHeight;
+    const map = this.map;
 
     // clear canvas
     ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, this.width * this.spriteWidth, this.height * this.spriteHeight);
+    ctx.fillRect(0, 0, this.width * spriteWidth, this.height * spriteHeight);
 
     // draw map
     const tileSpriteCache: number[] = [];
     const tileBackgroundCache: Color[] = [];
     const tileForegroundCache: Color[] = [];
-    const map = this.map;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
         const visible = map.isVisible(x, y);
@@ -151,24 +155,47 @@ class UI {
       }
     }
 
+    // draw entities
+    for (let entity of this.world.entities) {
+      if (map.isVisible(entity.x, entity.y))
+        this.drawEntity(entity);
+    }
+
     // draw mouse indicator
     this.drawRect(mx, my, Color.MouseIndicator);
+
+    // draw description text
+    if (map.isExplored(mx, my)) {
+      let tileText: string | null = null;
+      if (map.isVisible(mx, my)) {
+        const tileEntity = this.world.entityAt(mx, my);
+        if (tileEntity) tileText = tileEntity.description();
+        else tileText = Tile.description(map.get(mx, my));
+      } else tileText = Tile.description(map.get(mx, my));
+      if (tileText) {
+        ctx.font = "12px monospace";
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, tileText.length * 8 + 5, 16);
+        ctx.fillStyle = "black";
+        ctx.fillText(tileText, 5, 10);
+      }
+    }
 
     // draw fps
     const fpsText = `fps: ${this.fps.toFixed(2)}`;
     ctx.font = "12px monospace"
     ctx.fillStyle = "white";
-    ctx.fillRect(this.width * this.spriteWidth - 100, 0, 100, 16);
+    ctx.fillRect(this.width * spriteWidth - 100, 0, 100, 16);
     ctx.fillStyle = "black";
-    ctx.fillText(fpsText, this.width * this.spriteWidth - 100 + 5, 10);
+    ctx.fillText(fpsText, this.width * spriteWidth - 100 + 5, 10);
 
     // draw position
-    const posText = `pos: ${this.mx}, ${this.my}`;
+    const posText = `pos: ${mx}, ${my}`;
     ctx.font = "12px monospace"
     ctx.fillStyle = "white";
-    ctx.fillRect(this.width * this.spriteWidth - 200, 0, 100, 16);
+    ctx.fillRect(this.width * spriteWidth - 200, 0, 100, 16);
     ctx.fillStyle = "black";
-    ctx.fillText(posText, this.width * this.spriteWidth - 200 + 5, 10);
+    ctx.fillText(posText, this.width * spriteWidth - 200 + 5, 10);
   }
 
   private getTileDrawingInfo(tile: Tile): { sprite: number, background: Color, foreground: Color } {
@@ -191,6 +218,11 @@ class UI {
     const background = backgroundColors[i % backgroundColors.length];
     const foreground = foregroundColors[i % foregroundColors.length];
     return { sprite, background, foreground };
+  }
+
+  private drawEntity(entity: Entity): void {
+    if (entity instanceof Table)
+      this.drawSprite(8, entity.x, entity.y, Color.DarkBrown, Color.Brown);
   }
 
   // drawing helpers
