@@ -397,6 +397,120 @@ var ShadowCasting = class _ShadowCasting {
 };
 var shadowcasting_default = ShadowCasting;
 
+// src/game/world/actions/action.ts
+var Action = class {
+};
+var action_default = Action;
+
+// src/game/world/actions/stepaction.ts
+var StepAction = class extends action_default {
+  x;
+  y;
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
+  perform(game, actor) {
+    const world = game.world;
+    const map = world.map;
+    const { x, y } = this;
+    if (actor.x == x && actor.y == y) return true;
+    if (map.isBlocked(x, y)) return false;
+    if (world.actorAt(x, y)) return false;
+    actor.x = x;
+    actor.y = y;
+    if (actor.isPlayer()) game.refreshVisibility();
+    return true;
+  }
+};
+var stepaction_default = StepAction;
+
+// src/game/world/actions/moveaction.ts
+var MoveAction = class extends action_default {
+  x;
+  y;
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
+  perform(game, actor) {
+    const { x, y } = actor;
+    const { x: gx, y: gy } = this;
+    if (x == gx && y == gy) return true;
+    const path = game.findPath(x, y, gx, gy);
+    if (path) return path.map((p) => new stepaction_default(p.x, p.y));
+    return true;
+  }
+};
+var moveaction_default = MoveAction;
+
+// src/game/world/actors/actor.ts
+var Actor = class {
+  x;
+  y;
+  actionStack = [];
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+  isPlayer() {
+    return false;
+  }
+  isIdle() {
+    return this.actionStack.length == 0;
+  }
+  addActions(actions) {
+    for (let i = actions.length - 1; i >= 0; i--)
+      this.actionStack.push(actions[i]);
+  }
+  setAction(action) {
+    this.actionStack = [action];
+  }
+  nextAction() {
+    return this.actionStack.pop() || null;
+  }
+};
+var actor_default = Actor;
+
+// src/game/world/actors/npc.ts
+var NPC = class extends actor_default {
+  width;
+  height;
+  constructor(x, y, width, height) {
+    super(x, y);
+    this.width = width;
+    this.height = height;
+  }
+  description() {
+    return "npc";
+  }
+  decideAction() {
+    if (this.isIdle()) {
+      const x = Math.floor(Math.random() * this.width);
+      const y = Math.floor(Math.random() * this.height);
+      this.setAction(new moveaction_default(x, y));
+    }
+    return this.nextAction();
+  }
+};
+var npc_default = NPC;
+
+// src/game/world/actors/player.ts
+var Player = class extends actor_default {
+  description() {
+    return "player";
+  }
+  isPlayer() {
+    return true;
+  }
+  decideAction() {
+    return this.nextAction();
+  }
+};
+var player_default = Player;
+
 // src/game/world/entities/entity.ts
 var Entity = class {
   x;
@@ -507,6 +621,8 @@ var map_default = Map2;
 var World = class {
   map;
   entities = [];
+  actors = [];
+  player;
   constructor(width, height) {
     this.map = new map_default(width, height);
     for (let x = 0; x < width; x++) {
@@ -521,6 +637,9 @@ var World = class {
     }
     this.map.set(9, 2, tile_default.Fire);
     this.entities.push(new table_default(8, 9));
+    this.player = new player_default(1, 1);
+    this.actors.push(this.player);
+    this.actors.push(new npc_default(2, 2, width, height));
   }
   entityAt(x, y) {
     for (let entity of this.entities) {
@@ -528,6 +647,17 @@ var World = class {
         return entity;
     }
     return null;
+  }
+  actorAt(x, y) {
+    for (let actor of this.actors) {
+      if (actor.x == x && actor.y == y)
+        return actor;
+    }
+    return null;
+  }
+  actorOrEntityAt(x, y) {
+    const actor = this.actorAt(x, y);
+    return actor ? actor : this.entityAt(x, y);
   }
 };
 var world_default = World;
@@ -537,6 +667,9 @@ var Game = class {
   world;
   pathfinding;
   shadowcasting;
+  rounds = 0;
+  actorIndex = 0;
+  pendingActions = [];
   constructor(width, height) {
     this.world = new world_default(width, height);
     this.pathfinding = new pathfinding_default(this.world.map);
@@ -545,11 +678,209 @@ var Game = class {
   findPath(x, y, gx, gy) {
     return this.pathfinding.findPath(x, y, gx, gy);
   }
-  refreshVisibility(x, y) {
-    this.shadowcasting.refreshVisibility(x, y);
+  refreshVisibility() {
+    const player = this.world.player;
+    this.shadowcasting.refreshVisibility(player.x, player.y);
+  }
+  update() {
+    const actor = this.world.actors[this.actorIndex];
+    const action = actor.decideAction();
+    let advanced = false;
+    if (action) {
+      let actionResult;
+      let currentAction = action;
+      while (true) {
+        const result = currentAction.perform(this, actor);
+        if (!Array.isArray(result)) {
+          actionResult = result;
+          break;
+        }
+        if (result.length == 0) {
+          actionResult = false;
+          break;
+        }
+        actor.addActions(result);
+        currentAction = actor.nextAction();
+      }
+      if (actionResult) {
+        this.pendingActions.push({ actor, action: currentAction });
+        this.advanceActor();
+        advanced = true;
+      }
+    } else {
+      this.advanceActor();
+      advanced = true;
+    }
+    if (advanced && this.actorIndex == 0) {
+      this.rounds++;
+      const pendingActions = this.pendingActions;
+      this.pendingActions = [];
+      return pendingActions;
+    }
+    return null;
+  }
+  advanceActor() {
+    this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 };
 var game_default = Game;
+
+// src/game/world/actions/bumpaction.ts
+var BumpAction = class extends action_default {
+  x;
+  y;
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
+  perform(game, actor) {
+    return true;
+  }
+};
+var bumpaction_default = BumpAction;
+
+// src/game/world/actions/primaryaction.ts
+var PrimaryAction = class extends action_default {
+  x;
+  y;
+  constructor(x, y) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
+  perform(game, actor) {
+    const { x: gx, y: gy } = this;
+    const map = game.world.map;
+    const tile = map.get(gx, gy);
+    if (tile_default.isBlocked(tile)) {
+      map.set(gx, gy, tile_default.Empty);
+      const path = game.findPath(actor.x, actor.y, gx, gy);
+      map.set(gx, gy, tile);
+      if (path && path.length > 0) {
+        const last = path.pop();
+        const actions = path.map((p) => new stepaction_default(p.x, p.y));
+        actions.push(new bumpaction_default(last.x, last.y));
+        return actions;
+      }
+      return false;
+    }
+    return [new moveaction_default(gx, gy)];
+  }
+};
+var primaryaction_default = PrimaryAction;
+
+// src/ui/animationinfo.ts
+var AnimationInfo = class {
+  actor;
+  absoluteX;
+  absoluteY;
+  goalX;
+  goalY;
+  spriteWidth;
+  spriteHeight;
+  moving = false;
+  bumping = false;
+  animationSpeed = 0.25;
+  bumpRatio = 0.25;
+  spriteCycleSpeed = 100;
+  sprites;
+  backgroundColors;
+  foregroundColors;
+  cycles;
+  spriteIndex = 0;
+  spriteCycleAcc = 0;
+  constructor(actor, spriteWidth, spriteHeight, sprites, backgroundColors, foregroundColors) {
+    this.actor = actor;
+    this.absoluteX = actor.x * spriteWidth;
+    this.absoluteY = actor.y * spriteHeight;
+    this.goalX = this.absoluteX;
+    this.goalY = this.absoluteY;
+    this.spriteWidth = spriteWidth;
+    this.spriteHeight = spriteHeight;
+    this.sprites = sprites;
+    this.backgroundColors = backgroundColors;
+    this.foregroundColors = foregroundColors;
+    this.cycles = Math.max(sprites.length, backgroundColors.length, foregroundColors.length);
+  }
+  get sprite() {
+    return this.sprites[this.spriteIndex % this.sprites.length];
+  }
+  get backgroundColor() {
+    return this.backgroundColors[this.spriteIndex % this.backgroundColors.length];
+  }
+  get foregroundColor() {
+    return this.foregroundColors[this.spriteIndex % this.foregroundColors.length];
+  }
+  isMoving() {
+    return this.moving;
+  }
+  move(x, y) {
+    this.moving = true;
+    this.goalX = x * this.spriteWidth;
+    this.goalY = y * this.spriteHeight;
+  }
+  bump(x, y) {
+    this.moving = true;
+    this.bumping = true;
+    const dx = x - this.actor.x;
+    const dy = y - this.actor.y;
+    this.goalX = this.absoluteX + dx * this.spriteWidth * this.bumpRatio;
+    this.goalY = this.absoluteY + dy * this.spriteHeight * this.bumpRatio;
+  }
+  animate(action) {
+    if (action instanceof bumpaction_default)
+      this.bump(action.x, action.y);
+    else if (action instanceof stepaction_default)
+      this.move(action.x, action.y);
+  }
+  updateAnimation(delta) {
+    this.spriteCycleAcc += delta;
+    while (this.spriteCycleAcc >= this.spriteCycleSpeed) {
+      this.spriteCycleAcc -= this.spriteCycleSpeed;
+      this.spriteIndex++;
+      if (this.spriteIndex >= this.cycles)
+        this.spriteIndex = 0;
+    }
+    if (!this.moving) return;
+    let gx = this.goalX;
+    let gy = this.goalY;
+    let ax = this.absoluteX;
+    let ay = this.absoluteY;
+    if (gx == ax && gy == ay) {
+      if (this.bumping) {
+        this.bumping = false;
+        gx = this.actor.x * this.spriteWidth;
+        gy = this.actor.y * this.spriteHeight;
+      } else {
+        this.moving = false;
+        return;
+      }
+    }
+    let change = delta * this.animationSpeed;
+    if ((ax < gx || ax > gx) && (ay < gy || ay > gy))
+      change *= Math.SQRT1_2;
+    if (ax < gx) {
+      ax += change;
+      if (ax > gx) ax = gx;
+    } else if (ax > gx) {
+      ax -= change;
+      if (ax < gx) ax = gx;
+    }
+    if (ay < gy) {
+      ay += change;
+      if (ay > gy) ay = gy;
+    } else if (ay > gy) {
+      ay -= change;
+      if (ay < gy) ay = gy;
+    }
+    this.goalX = gx;
+    this.goalY = gy;
+    this.absoluteX = ax;
+    this.absoluteY = ay;
+  }
+};
+var animationinfo_default = AnimationInfo;
 
 // src/ui/color.ts
 var Color = class _Color {
@@ -583,6 +914,7 @@ var Color = class _Color {
   static BrightYellow = new _Color(255, 234, 0, 255);
   static NotVisible = new _Color(0, 0, 0, 0.5);
   static MouseIndicator = new _Color(0, 160, 0, 0.5);
+  static GoalIndicator = new _Color(0, 0, 160, 0.5);
 };
 var color_default = Color;
 
@@ -683,9 +1015,12 @@ var UI = class {
   tileCycleMax = 60;
   mx = 0;
   my = 0;
+  gx = 0;
+  gy = 0;
   game = new game_default(this.width, this.height);
   world = this.game.world;
   map = this.world.map;
+  animations = /* @__PURE__ */ new Map();
   async initialize(canvasId, spriteSheetUrl, spriteSheetWidth, spriteSheetHeight, originalSpriteWidth, originalSpriteHeight) {
     this.sprites = new sprites_default(originalSpriteWidth, originalSpriteHeight);
     await this.sprites.loadFromURL(spriteSheetUrl, spriteSheetWidth, spriteSheetHeight);
@@ -695,6 +1030,18 @@ var UI = class {
     this.ctx = ctx;
     canvas.addEventListener("mousemove", (event) => this.handleMouseMove(event));
     canvas.addEventListener("mousedown", (event) => this.handleMouseDown(event));
+    for (const actor of this.world.actors) {
+      const animationInfo = this.createAnimationInfo(actor);
+      if (animationInfo)
+        this.animations.set(actor, animationInfo);
+    }
+  }
+  createAnimationInfo(actor) {
+    if (actor instanceof player_default)
+      return new animationinfo_default(actor, this.spriteWidth, this.spriteHeight, [1], [color_default.White], [color_default.Black]);
+    if (actor instanceof npc_default)
+      return new animationinfo_default(actor, this.spriteWidth, this.spriteHeight, [1], [color_default.White], [color_default.Red]);
+    return null;
   }
   start() {
     this.running = true;
@@ -708,7 +1055,7 @@ var UI = class {
     this.running = false;
   }
   init() {
-    this.game.refreshVisibility(1, 1);
+    this.game.refreshVisibility();
   }
   loop(time) {
     if (!this.running) return;
@@ -729,7 +1076,16 @@ var UI = class {
   handleMouseDown(event) {
     const mx = this.mx;
     const my = this.my;
-    this.game.refreshVisibility(mx, my);
+    if (!this.map.isExplored(mx, my)) return;
+    if (event.buttons == 4 || event.ctrlKey && event.buttons == 1) {
+      this.gx = mx;
+      this.gy = my;
+      this.world.player.setAction(new primaryaction_default(mx, my));
+    } else if (event.buttons == 1) {
+      this.gx = mx;
+      this.gy = my;
+      this.world.player.setAction(new primaryaction_default(mx, my));
+    }
   }
   // logic
   update(delta) {
@@ -739,6 +1095,23 @@ var UI = class {
       this.tileCycleIndex++;
       if (this.tileCycleIndex >= this.tileCycleMax)
         this.tileCycleIndex = 0;
+    }
+    let anyMoving = false;
+    for (const actor of this.world.actors) {
+      const animation = this.animations.get(actor);
+      if (animation) {
+        animation.updateAnimation(delta);
+        if (animation.isMoving()) anyMoving = true;
+      }
+    }
+    if (!anyMoving) {
+      const actorActions = this.game.update();
+      if (actorActions) {
+        for (const actorAction of actorActions) {
+          const animationInfo = this.animations.get(actorAction.actor);
+          if (animationInfo) animationInfo.animate(actorAction.action);
+        }
+      }
     }
   }
   // drawing
@@ -787,11 +1160,17 @@ var UI = class {
       if (map.isVisible(entity.x, entity.y))
         this.drawEntity(entity);
     }
+    for (let actor of this.world.actors) {
+      if (map.isVisible(actor.x, actor.y))
+        this.drawActor(actor);
+    }
+    if (!this.world.player.isIdle())
+      this.drawRect(this.gx, this.gy, color_default.GoalIndicator);
     this.drawRect(mx, my, color_default.MouseIndicator);
     if (map.isExplored(mx, my)) {
       let tileText = null;
       if (map.isVisible(mx, my)) {
-        const tileEntity = this.world.entityAt(mx, my);
+        const tileEntity = this.world.actorOrEntityAt(mx, my);
         if (tileEntity) tileText = tileEntity.description();
         else tileText = tile_default.description(map.get(mx, my));
       } else tileText = tile_default.description(map.get(mx, my));
@@ -837,6 +1216,11 @@ var UI = class {
   drawEntity(entity) {
     if (entity instanceof table_default)
       this.drawSprite(8, entity.x, entity.y, color_default.DarkBrown, color_default.Brown);
+  }
+  drawActor(actor) {
+    const animation = this.animations.get(actor);
+    if (animation)
+      this.drawSpriteAbsolute(animation.sprite, animation.absoluteX, animation.absoluteY, animation.backgroundColor, animation.foregroundColor);
   }
   // drawing helpers
   drawSpriteAbsolute(index, x, y, background, foreground) {

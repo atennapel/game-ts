@@ -1,9 +1,14 @@
 import Game from "../game/game";
+import PrimaryAction from "../game/world/actions/primaryaction";
+import Actor from "../game/world/actors/actor";
+import NPC from "../game/world/actors/npc";
+import Player from "../game/world/actors/player";
 import Entity from "../game/world/entities/entity";
 import Table from "../game/world/entities/table";
-import Map from "../game/world/map";
+import M from "../game/world/map";
 import Tile from "../game/world/tile";
 import World from "../game/world/world";
+import AnimationInfo from "./animationinfo";
 import Color from "./color";
 import Sprites from "./sprites";
 
@@ -29,10 +34,14 @@ class UI {
 
   private mx: number = 0;
   private my: number = 0;
+  private gx: number = 0;
+  private gy: number = 0;
 
   readonly game: Game = new Game(this.width, this.height);
   private readonly world: World = this.game.world;
-  private readonly map: Map = this.world.map;
+  private readonly map: M = this.world.map;
+
+  private animations: Map<Actor, AnimationInfo> = new Map();
 
   async initialize(
     canvasId: string,
@@ -51,6 +60,20 @@ class UI {
 
     canvas.addEventListener("mousemove", event => this.handleMouseMove(event));
     canvas.addEventListener("mousedown", event => this.handleMouseDown(event));
+
+    for (const actor of this.world.actors) {
+      const animationInfo = this.createAnimationInfo(actor);
+      if (animationInfo)
+        this.animations.set(actor, animationInfo);
+    }
+  }
+
+  private createAnimationInfo(actor: Actor): AnimationInfo | null {
+    if (actor instanceof Player)
+      return new AnimationInfo(actor, this.spriteWidth, this.spriteHeight, [1], [Color.White], [Color.Black]);
+    if (actor instanceof NPC)
+      return new AnimationInfo(actor, this.spriteWidth, this.spriteHeight, [1], [Color.White], [Color.Red]);
+    return null;
   }
 
   start(): void {
@@ -67,7 +90,7 @@ class UI {
   }
 
   private init(): void {
-    this.game.refreshVisibility(1, 1);
+    this.game.refreshVisibility();
   }
 
   private loop(time: DOMHighResTimeStamp): void {
@@ -93,7 +116,16 @@ class UI {
   private handleMouseDown(event: MouseEvent): void {
     const mx = this.mx;
     const my = this.my;
-    this.game.refreshVisibility(mx, my);
+    if (!this.map.isExplored(mx, my)) return;
+    if (event.buttons == 4 || (event.ctrlKey && event.buttons == 1)) {
+      this.gx = mx;
+      this.gy = my;
+      this.world.player.setAction(new PrimaryAction(mx, my));
+    } else if (event.buttons == 1) {
+      this.gx = mx;
+      this.gy = my;
+      this.world.player.setAction(new PrimaryAction(mx, my));
+    }
   }
 
   // logic
@@ -105,6 +137,27 @@ class UI {
       this.tileCycleIndex++;
       if (this.tileCycleIndex >= this.tileCycleMax)
         this.tileCycleIndex = 0;
+    }
+
+    // update animations
+    let anyMoving = false;
+    for (const actor of this.world.actors) {
+      const animation = this.animations.get(actor);
+      if (animation) {
+        animation.updateAnimation(delta);
+        if (animation.isMoving()) anyMoving = true;
+      }
+    }
+
+    // perform game updates
+    if (!anyMoving) {
+      const actorActions = this.game.update();
+      if (actorActions) {
+        for (const actorAction of actorActions) {
+          const animationInfo = this.animations.get(actorAction.actor);
+          if (animationInfo) animationInfo.animate(actorAction.action);
+        }
+      }
     }
   }
 
@@ -161,6 +214,16 @@ class UI {
         this.drawEntity(entity);
     }
 
+    // draw actors
+    for (let actor of this.world.actors) {
+      if (map.isVisible(actor.x, actor.y))
+        this.drawActor(actor);
+    }
+
+    // draw goal
+    if (!this.world.player.isIdle())
+      this.drawRect(this.gx, this.gy, Color.GoalIndicator);
+
     // draw mouse indicator
     this.drawRect(mx, my, Color.MouseIndicator);
 
@@ -168,7 +231,7 @@ class UI {
     if (map.isExplored(mx, my)) {
       let tileText: string | null = null;
       if (map.isVisible(mx, my)) {
-        const tileEntity = this.world.entityAt(mx, my);
+        const tileEntity = this.world.actorOrEntityAt(mx, my);
         if (tileEntity) tileText = tileEntity.description();
         else tileText = Tile.description(map.get(mx, my));
       } else tileText = Tile.description(map.get(mx, my));
@@ -223,6 +286,12 @@ class UI {
   private drawEntity(entity: Entity): void {
     if (entity instanceof Table)
       this.drawSprite(8, entity.x, entity.y, Color.DarkBrown, Color.Brown);
+  }
+
+  private drawActor(actor: Actor): void {
+    const animation = this.animations.get(actor);
+    if (animation)
+      this.drawSpriteAbsolute(animation.sprite, animation.absoluteX, animation.absoluteY, animation.backgroundColor, animation.foregroundColor);
   }
 
   // drawing helpers

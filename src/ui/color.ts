@@ -34,6 +34,7 @@ class Color {
 
   static NotVisible = new Color(0, 0, 0, 0.5);
   static MouseIndicator = new Color(0, 160, 0, 0.5);
+  static GoalIndicator = new Color(0, 0, 160, 0.5);
 }
 
 export default Color;
