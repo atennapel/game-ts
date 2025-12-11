@@ -1,4 +1,5 @@
 import Actor from "./actors/actor";
+import KanrenNPC from "./actors/kanrennpc";
 import NPC from "./actors/npc";
 import Player from "./actors/player";
 import Entity from "./entities/entity";
@@ -33,6 +34,14 @@ class World {
     this.player = new Player(1, 1);
     this.actors.push(this.player);
     this.actors.push(new NPC(2, 2, width, height));
+    this.actors.push(new KanrenNPC(3, 3));
+  }
+
+  actorById(id: number): Actor | null {
+    for (const a of this.actors) {
+      if (a.id == id) return a;
+    }
+    return null;
   }
 
   entityAt(x: number, y: number): Entity | null {

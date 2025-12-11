@@ -446,14 +446,379 @@ var MoveAction = class extends action_default {
 };
 var moveaction_default = MoveAction;
 
+// src/game/world/brains/brain.ts
+var Brain = class {
+};
+var brain_default = Brain;
+
+// src/game/world/brains/kanrenbrain.ts
+var Stream = class {
+  static empty;
+  static singleton(value) {
+    return new Ext(value, this.empty);
+  }
+};
+var Empty = class extends Stream {
+  map(f) {
+    return this;
+  }
+  interleave(other) {
+    return other;
+  }
+  then(k) {
+    return this;
+  }
+  take(n, result = []) {
+    return result;
+  }
+  takeWhile(f, result = []) {
+    return result;
+  }
+};
+Stream.empty = new Empty();
+var Ext = class _Ext extends Stream {
+  head;
+  tail;
+  constructor(head, tail) {
+    super();
+    this.head = head;
+    this.tail = tail;
+  }
+  map(f) {
+    return new _Ext(f(this.head), this.tail.map(f));
+  }
+  interleave(other) {
+    return new _Ext(this.head, this.tail.interleave(other));
+  }
+  then(k) {
+    return k(this.head).interleave(this.tail.then(k));
+  }
+  take(n, result = []) {
+    if (n <= 0) return result;
+    result.push(this.head);
+    return this.tail.take(n - 1, result);
+  }
+  takeWhile(f, result = []) {
+    if (!f(this.head)) return result;
+    result.push(this.head);
+    return this.tail.takeWhile(f, result);
+  }
+};
+var Delay = class _Delay extends Stream {
+  thunk;
+  value = null;
+  constructor(thunk) {
+    super();
+    this.thunk = thunk;
+  }
+  force() {
+    if (!this.value) this.value = this.thunk();
+    return this.value;
+  }
+  map(f) {
+    return new _Delay(() => this.force().map(f));
+  }
+  interleave(other) {
+    return new _Delay(() => other.interleave(this.force()));
+  }
+  then(k) {
+    return new _Delay(() => this.force().then(k));
+  }
+  take(n, result) {
+    return this.force().take(n, result);
+  }
+  takeWhile(f, result = []) {
+    return this.force().takeWhile(f, result);
+  }
+};
+var Var = class {
+  id;
+  constructor(id) {
+    this.id = id;
+  }
+};
+var Constraint = class {
+};
+var State = class _State {
+  nextId;
+  env;
+  constraints;
+  constructor(nextId, env, constraints) {
+    this.nextId = nextId;
+    this.env = env;
+    this.constraints = constraints;
+  }
+  static empty = new _State(0, /* @__PURE__ */ new Map(), /* @__PURE__ */ new Map());
+  newVar() {
+    return [new _State(this.nextId + 1, this.env, this.constraints), new Var(this.nextId)];
+  }
+  withEnv(env) {
+    return new _State(this.nextId, env, this.constraints);
+  }
+  withConstraints(v, cs) {
+    const n = new Map(this.constraints);
+    if (cs.length == 0) n.delete(v);
+    else n.set(v, cs);
+    return new _State(this.nextId, this.env, n);
+  }
+  withConstraint(c) {
+    const env = this.env;
+    const newConstraints = new Map(this.constraints);
+    for (const t of c.terms) {
+      for (const v of _State.vars(Goal.zonk(env, t))) {
+        const a = newConstraints.get(v) || [];
+        newConstraints.set(v, a.concat([c]));
+      }
+    }
+    return new _State(this.nextId, this.env, newConstraints);
+  }
+  static vars(t, result = []) {
+    if (t instanceof Var) {
+      if (result.indexOf(t.id) >= 0) return result;
+      result.push(t.id);
+      return result;
+    } else if (Array.isArray(t)) {
+      for (const x of t) _State.vars(x, result);
+      return result;
+    }
+    return result;
+  }
+};
+var InequalityConstraint = class extends Constraint {
+  left;
+  right;
+  terms;
+  constructor(left, right) {
+    super();
+    this.left = left;
+    this.right = right;
+    this.terms = [left, right];
+  }
+};
+var Goal = class _Goal {
+  apply;
+  constructor(cont) {
+    this.apply = cont;
+  }
+  static delay(g) {
+    return new _Goal((state) => g().apply(state));
+  }
+  static succeed = new _Goal((state) => Stream.singleton(state));
+  static fail = new _Goal((state) => Stream.empty);
+  delay() {
+    return new _Goal((state) => new Delay(() => this.apply(state)));
+  }
+  static equals(a, b) {
+    return new _Goal((state) => {
+      const res = _Goal.unify(state, a, b);
+      return res ? Stream.singleton(res) : Stream.empty;
+    });
+  }
+  static notEquals(a0, b0) {
+    return new _Goal((state) => {
+      const a = _Goal.zonk(state.env, a0);
+      const b = _Goal.zonk(state.env, b0);
+      if (_Goal.ground(a) && _Goal.ground(b))
+        return _Goal.groundEquals(a, b) ? Stream.empty : Stream.singleton(state);
+      return Stream.singleton(state.withConstraint(new InequalityConstraint(a, b)));
+    });
+  }
+  static groundEquals(a, b) {
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b)) return false;
+      const l = a.length;
+      if (b.length != l) return false;
+      for (let i = 0; i < l; i++) if (!_Goal.groundEquals(a[i], b[i])) return false;
+      return true;
+    }
+    return a === b;
+  }
+  static exists(k) {
+    return new _Goal((state) => {
+      const [newState, newVar] = state.newVar();
+      return k(newVar).apply(newState);
+    });
+  }
+  static exists2(k) {
+    return _Goal.exists((v1) => _Goal.exists((v2) => k(v1, v2)));
+  }
+  or(b) {
+    return new _Goal((state) => this.apply(state).interleave(b.apply(state)));
+  }
+  and(b) {
+    return new _Goal((state) => this.apply(state).then(b.apply));
+  }
+  static any(x, options) {
+    let cur = _Goal.fail;
+    for (const v of options)
+      cur = cur.or(_Goal.equals(x, v)).delay();
+    return cur;
+  }
+  static all(x, options) {
+    let cur = _Goal.succeed;
+    for (const v of options)
+      cur = cur.and(_Goal.equals(x, v)).delay();
+    return cur;
+  }
+  static natural(x, n = 0) {
+    return _Goal.equals(x, n).or(_Goal.delay(() => _Goal.natural(x, n + 1))).delay();
+  }
+  static range(x, a, b) {
+    return a >= b ? _Goal.fail : _Goal.equals(x, a).or(_Goal.delay(() => _Goal.range(x, a + 1, b))).delay();
+  }
+  static run(n, goal) {
+    const state = State.empty;
+    const [nextState, newVar] = state.newVar();
+    const states = goal(newVar).apply(nextState).take(n);
+    const l = states.length;
+    const result = new Array(l);
+    for (let i = 0; i < l; i++) {
+      const state2 = states[i];
+      result[i] = _Goal.zonk(state2.env, newVar);
+    }
+    return result;
+  }
+  static runGround(n, goal) {
+    const state = State.empty;
+    const [nextState, newVar] = state.newVar();
+    const result = [];
+    goal(newVar).apply(nextState).takeWhile((state2) => {
+      if (result.length >= n) return false;
+      const value = _Goal.zonk(state2.env, newVar);
+      if (!_Goal.ground(value)) return true;
+      result.push(value);
+      return true;
+    });
+    return result;
+  }
+  static ground(t) {
+    if (t instanceof Var) return false;
+    if (Array.isArray(t)) {
+      for (const v of t) if (!this.ground(v)) return false;
+      return true;
+    }
+    return true;
+  }
+  static zonk(env, t) {
+    if (t instanceof Var) {
+      if (env.has(t.id)) return _Goal.zonk(env, env.get(t.id));
+      return t;
+    }
+    if (Array.isArray(t)) {
+      const l = t.length;
+      const r = new Array(l);
+      for (let i = 0; i < l; i++) r[i] = _Goal.zonk(env, t[i]);
+      return r;
+    }
+    return t;
+  }
+  static occurs(env, v, t0) {
+    const t = _Goal.zonk(env, t0);
+    if (t instanceof Var) return t.id == v;
+    else if (Array.isArray(t)) {
+      for (const x of t) if (_Goal.occurs(env, v, x)) return true;
+      return false;
+    }
+    return false;
+  }
+  static solve(state, v, t) {
+    if (_Goal.occurs(state.env, v, t)) return null;
+    if (state.constraints.has(v)) {
+      const newConstraints = state.constraints.get(v).map((c) => _Goal.solveConstraint(state, c));
+      if (newConstraints.indexOf(2) >= 0) return null;
+      return state.withConstraints(v, []).withEnv(new Map(state.env).set(v, t));
+    }
+    return state.withEnv(new Map(state.env).set(v, t));
+  }
+  static unify(state, a0, b0) {
+    const a = _Goal.zonk(state.env, a0);
+    const b = _Goal.zonk(state.env, b0);
+    if (a instanceof Var) {
+      if (b instanceof Var && (a == b || a.id == b.id)) return state;
+      return _Goal.solve(state, a.id, b);
+    } else if (b instanceof Var) return _Goal.solve(state, b.id, a);
+    else if (Array.isArray(a) && Array.isArray(b)) {
+      const l = a.length;
+      if (b.length != l) return null;
+      let acc = state;
+      for (let i = 0; i < l; i++) {
+        const res = _Goal.unify(acc, a[i], b[i]);
+        if (!res) return null;
+        acc = res;
+      }
+      return acc;
+    } else if (a === b) return state;
+    return null;
+  }
+  // 0 = unknown, 1 = succeed, 2 = fail
+  static solveConstraint(state, c) {
+    if (c instanceof InequalityConstraint) {
+      const a = _Goal.zonk(state.env, c.left);
+      const b = _Goal.zonk(state.env, c.right);
+      if (_Goal.ground(a) && _Goal.ground(b))
+        return _Goal.groundEquals(a, b) ? 2 : 1;
+      return 0;
+    }
+    return -1;
+  }
+};
+var KanrenBrain = class _KanrenBrain extends brain_default {
+  decideAction(game, actor) {
+    const goal = (p) => Goal.exists2((x2, y2) => Goal.notEquals(x2, actor.x).and(Goal.notEquals(y2, actor.y)).and(_KanrenBrain.position(game, x2, y2)).and(Goal.equals(p, [x2, y2])));
+    const result = Goal.runGround(100, goal);
+    if (result.length == 0) return null;
+    const [x, y] = result[Math.floor(Math.random() * result.length)];
+    return new moveaction_default(x, y);
+  }
+  static actor(game, x) {
+    return Goal.any(x, game.world.actors.map((a) => a.id));
+  }
+  static myX(actor, x) {
+    return Goal.equals(actor.x, x);
+  }
+  static myY(actor, y) {
+    return Goal.equals(actor.y, y);
+  }
+  static myPosition(actor, x, y) {
+    return _KanrenBrain.myX(actor, x).and(_KanrenBrain.myY(actor, y));
+  }
+  static position(game, x, y) {
+    if (x instanceof Var && y instanceof Var) {
+      const w = game.world.map.width;
+      const h = game.world.map.height;
+      return Goal.range(x, 0, w).and(Goal.range(y, 0, h));
+    } else if (x instanceof Var) {
+      const w = game.world.map.width;
+      const h = game.world.map.height;
+      if (typeof y != "number" || y < 0 || y >= h) return Goal.fail;
+      return Goal.range(x, 0, w);
+    } else if (y instanceof Var) {
+      const w = game.world.map.width;
+      const h = game.world.map.height;
+      if (typeof x != "number" || x < 0 || x >= w) return Goal.fail;
+      return Goal.range(y, 0, h);
+    } else {
+      const w = game.world.map.width;
+      const h = game.world.map.height;
+      if (typeof x == "number" && typeof y == "number" && x < 0 && x >= w && y < 0 && y >= h)
+        return Goal.succeed;
+      return Goal.fail;
+    }
+  }
+};
+var kanrenbrain_default = KanrenBrain;
+
 // src/game/world/actors/actor.ts
-var Actor = class {
+var Actor = class _Actor {
   x;
   y;
+  id;
+  static nextId = 0;
   actionStack = [];
   constructor(x, y) {
     this.x = x;
     this.y = y;
+    this.id = _Actor.nextId++;
   }
   isPlayer() {
     return false;
@@ -474,6 +839,26 @@ var Actor = class {
 };
 var actor_default = Actor;
 
+// src/game/world/actors/kanrennpc.ts
+var KanrenNPC = class extends actor_default {
+  brain;
+  constructor(x, y) {
+    super(x, y);
+    this.brain = new kanrenbrain_default();
+  }
+  description() {
+    return "kanrennpc";
+  }
+  decideAction(game) {
+    if (this.isIdle()) {
+      const action = this.brain.decideAction(game, this);
+      if (action) this.setAction(action);
+    }
+    return this.nextAction();
+  }
+};
+var kanrennpc_default = KanrenNPC;
+
 // src/game/world/actors/npc.ts
 var NPC = class extends actor_default {
   width;
@@ -486,7 +871,7 @@ var NPC = class extends actor_default {
   description() {
     return "npc";
   }
-  decideAction() {
+  decideAction(game) {
     if (this.isIdle()) {
       const x = Math.floor(Math.random() * this.width);
       const y = Math.floor(Math.random() * this.height);
@@ -505,7 +890,7 @@ var Player = class extends actor_default {
   isPlayer() {
     return true;
   }
-  decideAction() {
+  decideAction(game) {
     return this.nextAction();
   }
 };
@@ -640,6 +1025,13 @@ var World = class {
     this.player = new player_default(1, 1);
     this.actors.push(this.player);
     this.actors.push(new npc_default(2, 2, width, height));
+    this.actors.push(new kanrennpc_default(3, 3));
+  }
+  actorById(id) {
+    for (const a of this.actors) {
+      if (a.id == id) return a;
+    }
+    return null;
   }
   entityAt(x, y) {
     for (let entity of this.entities) {
@@ -684,7 +1076,7 @@ var Game = class {
   }
   update() {
     const actor = this.world.actors[this.actorIndex];
-    const action = actor.decideAction();
+    const action = actor.decideAction(this);
     let advanced = false;
     if (action) {
       let actionResult;
@@ -702,25 +1094,17 @@ var Game = class {
         actor.addActions(result);
         currentAction = actor.nextAction();
       }
-      if (actionResult) {
+      if (actionResult)
         this.pendingActions.push({ actor, action: currentAction });
-        this.advanceActor();
-        advanced = true;
-      }
-    } else {
-      this.advanceActor();
-      advanced = true;
     }
-    if (advanced && this.actorIndex == 0) {
+    this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
+    if (this.actorIndex == 0) {
       this.rounds++;
       const pendingActions = this.pendingActions;
       this.pendingActions = [];
       return pendingActions;
     }
     return null;
-  }
-  advanceActor() {
-    this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 };
 var game_default = Game;
@@ -907,8 +1291,8 @@ var Color = class _Color {
   static DarkGrey = new _Color(100, 100, 100, 255);
   static Red = new _Color(255, 0, 0, 255);
   static Red155 = new _Color(155, 0, 0, 255);
-  static Blue = new _Color(0, 255, 0, 255);
-  static Green = new _Color(0, 0, 255, 255);
+  static Blue = new _Color(0, 0, 255, 255);
+  static Green = new _Color(0, 255, 0, 255);
   static Brown = new _Color(102, 51, 0, 255);
   static DarkBrown = new _Color(51, 25, 0, 255);
   static BrightYellow = new _Color(255, 234, 0, 255);
@@ -1041,6 +1425,8 @@ var UI = class {
       return new animationinfo_default(actor, this.spriteWidth, this.spriteHeight, [1], [color_default.White], [color_default.Black]);
     if (actor instanceof npc_default)
       return new animationinfo_default(actor, this.spriteWidth, this.spriteHeight, [1], [color_default.White], [color_default.Red]);
+    if (actor instanceof kanrennpc_default)
+      return new animationinfo_default(actor, this.spriteWidth, this.spriteHeight, [1], [color_default.White], [color_default.Blue]);
     return null;
   }
   start() {

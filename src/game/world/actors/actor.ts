@@ -1,19 +1,24 @@
+import Game from "../../game";
 import Action from "../actions/action";
 
 abstract class Actor {
   x: number;
   y: number;
+  readonly id: number;
+
+  private static nextId: number = 0;
 
   private actionStack: Action[] = [];
 
   constructor(x: number, y: number) {
     this.x = x;
     this.y = y;
+    this.id = Actor.nextId++;
   }
 
   abstract description(): string;
 
-  abstract decideAction(): Action | null;
+  abstract decideAction(game: Game): Action | null;
 
   isPlayer(): boolean {
     return false;

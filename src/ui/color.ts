@@ -26,8 +26,8 @@ class Color {
   static DarkGrey = new Color(100, 100, 100, 255);
   static Red = new Color(255, 0, 0, 255);
   static Red155 = new Color(155, 0, 0, 255);
-  static Blue = new Color(0, 255, 0, 255);
-  static Green = new Color(0, 0, 255, 255);
+  static Blue = new Color(0, 0, 255, 255);
+  static Green = new Color(0, 255, 0, 255);
   static Brown = new Color(102, 51, 0, 255);
   static DarkBrown = new Color(51, 25, 0, 255);
   static BrightYellow = new Color(255, 234, 0, 255);

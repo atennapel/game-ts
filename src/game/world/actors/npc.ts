@@ -1,3 +1,4 @@
+import Game from "../../game";
 import Action from "../actions/action";
 import MoveAction from "../actions/moveaction";
 import Actor from "./actor";
@@ -16,7 +17,7 @@ class NPC extends Actor {
     return "npc";
   }
 
-  override decideAction(): Action | null {
+  override decideAction(game: Game): Action | null {
     if (this.isIdle()) {
       const x = Math.floor(Math.random() * this.width);
       const y = Math.floor(Math.random() * this.height);

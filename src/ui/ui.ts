@@ -1,6 +1,7 @@
 import Game from "../game/game";
 import PrimaryAction from "../game/world/actions/primaryaction";
 import Actor from "../game/world/actors/actor";
+import KanrenNPC from "../game/world/actors/kanrennpc";
 import NPC from "../game/world/actors/npc";
 import Player from "../game/world/actors/player";
 import Entity from "../game/world/entities/entity";
@@ -73,6 +74,8 @@ class UI {
       return new AnimationInfo(actor, this.spriteWidth, this.spriteHeight, [1], [Color.White], [Color.Black]);
     if (actor instanceof NPC)
       return new AnimationInfo(actor, this.spriteWidth, this.spriteHeight, [1], [Color.White], [Color.Red]);
+    if (actor instanceof KanrenNPC)
+      return new AnimationInfo(actor, this.spriteWidth, this.spriteHeight, [1], [Color.White], [Color.Blue]);
     return null;
   }
 

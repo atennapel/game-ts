@@ -1,3 +1,4 @@
+import Game from "../../game";
 import Action from "../actions/action";
 import Actor from "./actor";
 
@@ -10,7 +11,7 @@ class Player extends Actor {
     return true;
   }
 
-  override decideAction(): Action | null {
+  override decideAction(game: Game): Action | null {
     return this.nextAction();
   }
 }

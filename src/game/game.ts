@@ -33,7 +33,7 @@ class Game {
 
   update(): ActorAction[] | null {
     const actor = this.world.actors[this.actorIndex];
-    const action = actor.decideAction();
+    const action = actor.decideAction(this);
     let advanced = false;
     if (action) {
       let actionResult;
@@ -51,26 +51,17 @@ class Game {
         actor.addActions(result);
         currentAction = actor.nextAction()!;
       }
-      if (actionResult) {
+      if (actionResult)
         this.pendingActions.push({ actor, action: currentAction });
-        this.advanceActor();
-        advanced = true;
-      }
-    } else {
-      this.advanceActor();
-      advanced = true;
     }
-    if (advanced && this.actorIndex == 0) {
+    this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
+    if (this.actorIndex == 0) {
       this.rounds++;
       const pendingActions = this.pendingActions;
       this.pendingActions = [];
       return pendingActions;
     }
     return null;
-  }
-
-  private advanceActor(): void {
-    this.actorIndex = (this.actorIndex + 1) % this.world.actors.length;
   }
 }
 
